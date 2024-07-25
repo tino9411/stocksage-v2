@@ -16,6 +16,7 @@
     "express": "^4.19.2",
     "mongoose": "^8.5.1",
     "openai": "^4.53.0",
+    "react-syntax-highlighter": "^15.5.0",
     "technicalindicators": "^3.1.0"
   }
 }
