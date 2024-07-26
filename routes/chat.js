@@ -6,6 +6,20 @@ require('dotenv').config();
 
 const chat = new Chat(process.env.OPENAI_API_KEY);
 
+function processAssistantResponse(text) {
+    // Replace single backticks with a special marker
+    let processed = text.replace(/`([^`\n]+)`/g, '§§§$1§§§');
+    
+    // Replace triple backticks with a different marker
+    processed = processed.replace(/```([\s\S]*?)```/g, '£££$1£££');
+    
+    // Now replace the markers with proper Markdown syntax
+    processed = processed.replace(/§§§/g, '`');
+    processed = processed.replace(/£££/g, '```');
+    
+    return processed;
+  }
+
 router.post('/initialize', async (req, res) => {
     try {
         await chat.initializeAssistant({
@@ -71,25 +85,27 @@ Remember to adjust your language and detail level based on the user's questions 
 
 router.post('/start', async (req, res) => {
     try {
-        const { message } = req.body;
-        const response = await chat.startConversation(message);
-        res.json({ message: response });
+      const { message } = req.body;
+      const response = await chat.startConversation(message);
+      const processedResponse = processAssistantResponse(response);
+      res.json({ message: processedResponse });
     } catch (error) {
-        console.error('Error starting conversation:', error);
-        res.status(500).json({ error: "Failed to start conversation" });
+      console.error('Error starting conversation:', error);
+      res.status(500).json({ error: "Failed to start conversation" });
     }
-});
-
-router.post('/message', async (req, res) => {
+  });
+  
+  router.post('/message', async (req, res) => {
     try {
-        const { message } = req.body;
-        const response = await chat.sendMessage(message);
-        res.json({ message: response });
+      const { message } = req.body;
+      const response = await chat.sendMessage(message);
+      const processedResponse = processAssistantResponse(response);
+      res.json({ message: processedResponse });
     } catch (error) {
-        console.error('Error sending message:', error);
-        res.status(500).json({ error: "Failed to send message" });
+      console.error('Error sending message:', error);
+      res.status(500).json({ error: "Failed to send message" });
     }
-});
+  });
 
 router.post('/end', async (req, res) => {
     try {
