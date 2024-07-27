@@ -1,3 +1,4 @@
+// utils/TechnicalAnalysisAssistant.js
 const BaseAssistantService = require('./BaseAssistantService');
 const { calculateTechnicalIndicators } = require('../services/calculateTechnicalIndicators');
 const { fetchRealTimeQuote } = require('../services/fetchRealTimeQuote');

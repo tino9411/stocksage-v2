@@ -1,4 +1,4 @@
-//BaseAssistantService.js
+//utils/BaseAssistantService.js
 const OpenAI = require('openai');
 const connectDB = require('../config/db');
 

@@ -1,3 +1,4 @@
+// utils/FinancialAnalysisAssistant.js
 const BaseAssistantService = require('./BaseAssistantService');
 const { fetchIncomeStatement } = require('../services/fetchIncomeStatement');
 const { fetchBalanceSheet } = require('../services/fetchBalanceSheet');
