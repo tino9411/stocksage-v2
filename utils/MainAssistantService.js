@@ -146,7 +146,7 @@ class MainAssistantService extends BaseAssistantService {
             content: message
         };
 
-        console.log(`Inter-assistant message: ${JSON.stringify(formattedMessage)}`);
+        this.addSystemLog(`Inter-assistant message: ${JSON.stringify(formattedMessage)}`);
 
         try {
             // Process the message with the sub-assistant
