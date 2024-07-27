@@ -53,25 +53,22 @@ const server = app.listen(port, () => {
 // Graceful shutdown function
 async function gracefulShutdown() {
     console.log('Shutting down gracefully...');
-    
-    // Delete the main assistant and all sub-assistants
+    // Delete the main assistant, all sub-assistants, and threads
     if (chat.mainAssistant) {
-        console.log('Deleting assistants...');
-        await chat.mainAssistant.deleteAllAssistants();
+      console.log('Deleting assistants and threads...');
+      await chat.endConversation();
     }
-
     // Close the server
     server.close(() => {
-        console.log('Server closed');
-        process.exit(0);
+      console.log('Server closed');
+      process.exit(0);
     });
-
     // If server hasn't finished in 10 seconds, shut down forcefully
     setTimeout(() => {
-        console.error('Could not close connections in time, forcefully shutting down');
-        process.exit(1);
+      console.error('Could not close connections in time, forcefully shutting down');
+      process.exit(1);
     }, 10000);
-}
+  }
 
 // Listen for shutdown signals
 process.on('SIGTERM', gracefulShutdown);

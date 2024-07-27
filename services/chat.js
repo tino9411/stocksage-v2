@@ -8,14 +8,14 @@ class Chat {
   }
 
   async initializeAssistant({ model, name }) {
-      console.log('Initializing main assistant...');
-
-      await this.mainAssistant.initialize({
-          model,
-          name
-      });
-
-      console.log('Main assistant initialized');
+    console.log('Initializing main assistant...');
+    // Recreate the MainAssistantService instance
+    this.mainAssistant = new MainAssistantService(this.apiKey);
+    await this.mainAssistant.initialize({
+      model,
+      name
+    });
+    console.log('Main assistant initialized');
   }
 
     async startConversation(initialMessage) {
@@ -48,14 +48,34 @@ class Chat {
     }
 
     async endConversation() {
-        console.log('Ending conversation...');
-        if (this.threadId) {
-            const deleteThreadResponse = await this.mainAssistant.deleteThread(this.threadId);
-            console.log('Deleted Thread:', deleteThreadResponse);
-            this.threadId = null;
-        }
-        console.log('Conversation ended');
+      if (this.mainAssistant) {
+        console.log('Deleting assistants and threads...');
+        await this.mainAssistant.deleteAllAssistants();
+        await this.deleteAllThreads();
+        this.mainAssistant = null;
+        this.threadId = null;
+      }
     }
-}
+
+    async deleteAllThreads() {
+      if (this.threadId) {
+        try {
+          await this.client.beta.threads.del(this.threadId);
+          console.log(`Thread ${this.threadId} deleted`);
+        } catch (error) {
+          console.error(`Error deleting thread ${this.threadId}:`, error);
+        }
+      }
+      // Also delete sub-assistant threads
+      for (const threadId of Object.values(this.mainAssistant.subAssistantThreads)) {
+        try {
+          await this.client.beta.threads.del(threadId);
+          console.log(`Sub-assistant thread ${threadId} deleted`);
+        } catch (error) {
+          console.error(`Error deleting sub-assistant thread ${threadId}:`, error);
+        }
+      }
+    }
+  }
 
 module.exports = Chat;

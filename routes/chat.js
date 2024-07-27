@@ -58,13 +58,13 @@ router.post('/message', async (req, res) => {
 });
 
 router.post('/end', async (req, res) => {
-    try {
-        await chat.endConversation();
-        res.json({ message: "Conversation ended successfully" });
-    } catch (error) {
-        console.error('Error ending conversation:', error);
-        res.status(500).json({ error: "Failed to end conversation" });
-    }
+  try {
+    await chat.endConversation();
+    res.json({ message: "Conversation ended successfully. All assistants and threads deleted." });
+  } catch (error) {
+    console.error('Error ending conversation:', error);
+    res.status(500).json({ error: "Failed to end conversation and delete resources" });
+  }
 });
 
 module.exports = router;

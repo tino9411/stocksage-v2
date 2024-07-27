@@ -186,20 +186,30 @@ class MainAssistantService extends BaseAssistantService {
     async deleteAllAssistants() {
         console.log('Deleting main assistant...');
         if (this.assistantId) {
-            await this.deleteAssistant(this.assistantId);
-            this.assistantId = null;
+          try {
+            await this.client.beta.assistants.del(this.assistantId);
+            console.log(`Main assistant ${this.assistantId} deleted`);
+          } catch (error) {
+            console.error(`Error deleting main assistant ${this.assistantId}:`, error);
+          }
+          this.assistantId = null;
         }
-
+      
         console.log('Deleting sub-assistants...');
         for (const [name, assistant] of Object.entries(this.subAssistants)) {
-            if (assistant.assistantId) {
-                await assistant.deleteAssistant(assistant.assistantId);
-                assistant.assistantId = null;
+          if (assistant.assistantId) {
+            try {
+              await this.client.beta.assistants.del(assistant.assistantId);
+              console.log(`Sub-assistant ${name} (${assistant.assistantId}) deleted`);
+            } catch (error) {
+              console.error(`Error deleting sub-assistant ${name} (${assistant.assistantId}):`, error);
             }
+            assistant.assistantId = null;
+          }
         }
-
+      
         console.log('All assistants deleted');
-    }
+      }
 }
 
 module.exports = MainAssistantService;
