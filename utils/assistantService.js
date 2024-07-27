@@ -274,13 +274,13 @@ class AssistantService {
                     console.log(`Tool ${name} executed successfully for symbol ${parsedArgs.symbol}`);
                     return {
                         tool_call_id: id,
-                        output: JSON.stringify({ success: true, message: "Data retrieved successfully" }),
+                        output: JSON.stringify(result), // Return the actual result
                     };
                 } catch (error) {
                     console.error(`Error executing tool ${name}:`, error);
                     return {
                         tool_call_id: id,
-                        output: JSON.stringify({ success: false, error: error.message }),
+                        output: JSON.stringify({ error: error.message }),
                     };
                 }
             }));
