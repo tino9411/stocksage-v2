@@ -1,6 +1,7 @@
 const BaseAssistantService = require('./BaseAssistantService');
 const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
+const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 
 
 class MainAssistantService extends BaseAssistantService {
@@ -38,7 +39,7 @@ class MainAssistantService extends BaseAssistantService {
                         subAssistantName: {
                             type: "string",
                             description: "The name of the sub-assistant to message",
-                            enum: ["CompanyProfile", "FinancialAnalysis"]  // Add FinancialAnalysis here
+                            enum: ["CompanyProfile", "FinancialAnalysis", "TechnicalAnalysis"]
                         },
                         message: {
                             type: "string",
@@ -66,6 +67,10 @@ class MainAssistantService extends BaseAssistantService {
         // Initialize FinancialAnalysis sub-assistant
         this.subAssistants.FinancialAnalysis = new FinancialAnalysisAssistant(this.apiKey);
         await this.subAssistants.FinancialAnalysis.initialize({ model, name: "FinancialAnalysis" });
+
+        // Initialize TechnicalAnalysis sub-assistant
+        this.subAssistants.TechnicalAnalysis = new TechnicalAnalysisAssistant(this.apiKey);
+        await this.subAssistants.TechnicalAnalysis.initialize({ model, name: "TechnicalAnalysis" });
     }
 
     async handleRequiresAction(thread_id, run) {

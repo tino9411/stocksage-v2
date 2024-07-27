@@ -1,6 +1,7 @@
 const BaseAssistantService = require('./BaseAssistantService');
-const { fetchHistoricalData } = require('../services/fetchHistoricalData');
+const { calculateTechnicalIndicators } = require('../services/calculateTechnicalIndicators');
 const { fetchRealTimeQuote } = require('../services/fetchRealTimeQuote');
+
 
 class TechnicalAnalysisAssistant extends BaseAssistantService {
     constructor(apiKey) {
@@ -19,11 +20,11 @@ class TechnicalAnalysisAssistant extends BaseAssistantService {
     }
 
     async initialize({ model, name }) {
-        const fetchHistoricalDataTool = {
+        const calculateTechnicalIndicatorsTool = {
             type: "function",
             function: {
-                name: "fetchHistoricalData",
-                description: "Fetch historical price data for a given stock symbol",
+                name: "calculateTechnicalIndicators",
+                description: "Fetch the technical indicators for a given stock",
                 parameters: {
                     type: "object",
                     properties: {
@@ -59,7 +60,7 @@ class TechnicalAnalysisAssistant extends BaseAssistantService {
             model,
             name,
             instructions: this.instructions,
-            tools: [fetchHistoricalDataTool, fetchRealTimeQuoteTool]
+            tools: [calculateTechnicalIndicatorsTool, fetchRealTimeQuoteTool]
         });
         this.assistantId = newAssistant.id;
         console.log('Technical Analysis Assistant initialized:', newAssistant);
@@ -77,8 +78,8 @@ class TechnicalAnalysisAssistant extends BaseAssistantService {
                 const parsedArgs = JSON.parse(args);
                 try {
                     let result;
-                    if (name === 'fetchHistoricalData') {
-                        result = await fetchHistoricalData(parsedArgs.symbol);
+                    if (name === 'calculateTechnicalIndicators') {
+                        result = await calculateTechnicalIndicators(parsedArgs.symbol);
                     } else if (name === 'fetchRealTimeQuote') {
                         result = await fetchRealTimeQuote(parsedArgs.symbol);
                     } else {
