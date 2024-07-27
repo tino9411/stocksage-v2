@@ -209,6 +209,11 @@ class BaseAssistantService {
         }
     }
 
+    async processMessage(message, thread_id) {
+        // This method should be implemented by each sub-assistant
+        throw new Error('processMessage must be implemented by subclass');
+    }
+
     async handleRunStatus(thread_id, run) {
         console.log('Handling run status...');
         while (true) {

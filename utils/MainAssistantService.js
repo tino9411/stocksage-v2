@@ -1,10 +1,13 @@
-//MainAssistantService.js
 const BaseAssistantService = require('./BaseAssistantService');
+const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 
 class MainAssistantService extends BaseAssistantService {
     constructor(apiKey) {
         super(apiKey);
         this.assistantId = null;
+        this.assistantName = 'MainAssistant';
+        this.subAssistants = {};
+        this.subAssistantThreads = {};
         this.instructions = `You are the main stock and financial analyst. Your role is to analyze stock data and provide insightful reports.
         You have access to various financial data and metrics for stocks. When asked about a specific stock,
         you should retrieve the necessary data, process it, and provide a comprehensive analysis.
@@ -16,7 +19,7 @@ class MainAssistantService extends BaseAssistantService {
         5. Potential risks and opportunities
         6. A summary and recommendation (buy, sell or hold). Include a recommended entry price.
         
-        When you need specific financial or technical information, use the messageSubAssistant function to request it.
+        When you need specific information, use the messageSubAssistant function to request it from the appropriate sub-assistant.
         Always provide clear explanations and justify your analysis.
         Be conversational and engaging in your responses. Remember the context of the ongoing conversation.`;
     }
@@ -26,14 +29,14 @@ class MainAssistantService extends BaseAssistantService {
             type: "function",
             function: {
                 name: "messageSubAssistant",
-                description: "Simulate sending a message to a specific sub-assistant",
+                description: "Send a message to a specific sub-assistant",
                 parameters: {
                     type: "object",
                     properties: {
                         subAssistantName: {
                             type: "string",
                             description: "The name of the sub-assistant to message",
-                            enum: ["financial", "technical"]  // Example sub-assistants
+                            enum: ["CompanyProfile"]
                         },
                         message: {
                             type: "string",
@@ -53,6 +56,10 @@ class MainAssistantService extends BaseAssistantService {
         });
         this.assistantId = newAssistant.id;
         console.log('Main Assistant initialized:', newAssistant);
+
+        // Initialize CompanyProfile sub-assistant
+        this.subAssistants.CompanyProfile = new CompanyProfileAssistant(this.apiKey);
+        await this.subAssistants.CompanyProfile.initialize({ model, name: "CompanyProfile" });
     }
 
     async handleRequiresAction(thread_id, run) {
@@ -68,8 +75,7 @@ class MainAssistantService extends BaseAssistantService {
                 try {
                     let result;
                     if (name === 'messageSubAssistant') {
-                        result = `Simulated message to ${parsedArgs.subAssistantName} assistant: "${parsedArgs.message}"`;
-                        console.log(result);
+                        result = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
                     } else {
                         throw new Error(`Unknown function ${name}`);
                     }
@@ -101,8 +107,69 @@ class MainAssistantService extends BaseAssistantService {
         return run;
     }
 
-    async chatWithAssistant(thread_id, assistant_id, userMessage) {
-        return await super.chatWithAssistant(thread_id, assistant_id, userMessage);
+    async messageSubAssistant(subAssistantName, message) {
+        console.log(`Attempting to message sub-assistant: ${subAssistantName}`);
+        const subAssistant = this.subAssistants[subAssistantName];
+        if (!subAssistant) {
+            console.error(`Sub-assistant ${subAssistantName} not found`);
+            throw new Error(`Sub-assistant ${subAssistantName} not found`);
+        }
+
+        let threadId = this.subAssistantThreads[subAssistantName];
+        if (!threadId) {
+            // Create a new thread for this sub-assistant if it doesn't exist
+            const newThread = await this.createThread({ metadata: { subAssistant: subAssistantName } });
+            threadId = newThread.id;
+            this.subAssistantThreads[subAssistantName] = threadId;
+        }
+
+        const formattedMessage = {
+            sender: {
+                id: this.assistantId,
+                name: this.assistantName
+            },
+            receiver: {
+                id: subAssistant.assistantId,
+                name: subAssistant.assistantName
+            },
+            content: message
+        };
+
+        console.log(`Inter-assistant message: ${JSON.stringify(formattedMessage)}`);
+
+        try {
+            // Process the message with the sub-assistant
+            const response = await subAssistant.processMessage(formattedMessage, threadId);
+
+            const formattedResponse = {
+                sender: {
+                    id: subAssistant.assistantId,
+                    name: subAssistant.assistantName
+                },
+                receiver: {
+                    id: this.assistantId,
+                    name: this.assistantName
+                },
+                content: response
+            };
+
+            console.log(`Sub-assistant response: ${JSON.stringify(formattedResponse)}`);
+
+            return formattedResponse;
+        } catch (error) {
+            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
+            return {
+                sender: {
+                    id: subAssistant.assistantId,
+                    name: subAssistant.assistantName
+                },
+                receiver: {
+                    id: this.assistantId,
+                    name: this.assistantName
+                },
+                content: `Error: Unable to process message. ${error.message}`
+            };
+        }
     }
 }
 
