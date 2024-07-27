@@ -1,3 +1,4 @@
+//services/fetchBalanceSheet.js
 const Stock = require('../models/Stock');
 const axios = require('axios');
 require('dotenv').config();
@@ -95,13 +96,14 @@ async function fetchBalanceSheet(symbol, years = 5, forceRefresh = false) {
         balanceSheets.sort((a, b) => b.date - a.date);
 
         // Update the stock object with new balance sheets
-        if (stock) {
-            stock.balance_sheets = balanceSheets;
-            await stock.save();
-        } else {
-            stock = new Stock({ symbol: symbol, balance_sheets: balanceSheets });
-            await stock.save();
-        }
+        await Stock.findOneAndUpdate(
+            { symbol: symbol },
+            { 
+                $set: { balance_sheets: balanceSheets },
+                $setOnInsert: { symbol: symbol }
+            },
+            { new: true, upsert: true }
+        );
 
         console.log(`Successfully fetched and saved balance sheet data for ${symbol}`);
         return balanceSheets;

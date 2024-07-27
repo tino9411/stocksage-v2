@@ -1,3 +1,4 @@
+//services/fetchIncomeStatement.js
 const Stock = require('../models/Stock');
 const axios = require('axios');
 require('dotenv').config();
@@ -5,35 +6,38 @@ require('dotenv').config();
 const FMP_API_KEY = process.env.FMP_API_KEY;
 const FMP_BASE_URL = "https://financialmodelingprep.com/api/v3";
 
-async function fetchIncomeStatement(symbol, years = 5, forceRefresh = false) {
-    try {
-        let stock = await Stock.findOne({ symbol: symbol });
-        
-        // Check if we already have recent income statements (e.g., less than 1 day old)
-        if (!forceRefresh && stock && stock.income_statement && stock.income_statement.length > 0) {
-            const latestStatement = stock.income_statement[0];
-            if ((new Date() - latestStatement.date) / (1000 * 60 * 60 * 24) < 1) {
-                console.log(`Using cached income statements for ${symbol}`);
-                return stock.income_statement;
+async function fetchIncomeStatement(symbol, years = 5, forceRefresh = false, maxRetries = 3) {
+    let retries = 0;
+    while (retries < maxRetries) {
+        try {
+            let stock = await Stock.findOne({ symbol: symbol });
+            
+            // Check if we already have recent income statements (e.g., less than 1 day old)
+            if (!forceRefresh && stock && stock.income_statement && stock.income_statement.length > 0) {
+                const latestStatement = stock.income_statement[0];
+                if ((new Date() - latestStatement.date) / (1000 * 60 * 60 * 24) < 1) {
+                    console.log(`Using cached income statements for ${symbol}`);
+                    return stock.income_statement;
+                }
             }
-        }
 
-        // If no recent data, fetch from FMP API
-        const annualUrl = `${FMP_BASE_URL}/income-statement/${symbol}?period=annual&limit=${years}&apikey=${FMP_API_KEY}`;
-        const quarterlyUrl = `${FMP_BASE_URL}/income-statement/${symbol}?period=quarter&limit=${years * 4}&apikey=${FMP_API_KEY}`;
+            // If no recent data, fetch from FMP API
+            const annualUrl = `${FMP_BASE_URL}/income-statement/${symbol}?period=annual&limit=${years}&apikey=${FMP_API_KEY}`;
+            const quarterlyUrl = `${FMP_BASE_URL}/income-statement/${symbol}?period=quarter&limit=${years * 4}&apikey=${FMP_API_KEY}`;
 
-        const [annualResponse, quarterlyResponse] = await Promise.all([
-            axios.get(annualUrl),
-            axios.get(quarterlyUrl)
-        ]);
+            const [annualResponse, quarterlyResponse] = await Promise.all([
+                axios.get(annualUrl),
+                axios.get(quarterlyUrl)
+            ]);
 
-        const annualData = annualResponse.data;
-        const quarterlyData = quarterlyResponse.data;
+            const annualData = annualResponse.data;
+            const quarterlyData = quarterlyResponse.data;
 
-        if (annualData.length === 0 && quarterlyData.length === 0) {
-            console.warn(`No income statement data found for ${symbol}`);
-            return null;
-        }
+            if (annualData.length === 0 && quarterlyData.length === 0) {
+                console.warn(`No income statement data found for ${symbol}`);
+                return null;
+            }
+
 
         const incomeStatements = [...annualData, ...quarterlyData]
             .map(statement => ({
@@ -78,24 +82,32 @@ async function fetchIncomeStatement(symbol, years = 5, forceRefresh = false) {
         // Sort income statements by date (newest first)
         incomeStatements.sort((a, b) => b.date - a.date);
 
-        // Update the stock object with new income statements
-        if (stock) {
-            stock.income_statement = incomeStatements;
-            await stock.save();
+         // Update the stock object with new income statements
+         if (stock) {
+            stock = await Stock.findOneAndUpdate(
+                { _id: stock._id },
+                { $set: { income_statement: incomeStatements } },
+                { new: true, runValidators: true }
+            );
         } else {
-            stock = new Stock({ symbol: symbol, income_statement: incomeStatements });
-            await stock.save();
+            stock = await Stock.create({ symbol: symbol, income_statement: incomeStatements });
         }
 
         console.log(`Successfully fetched and saved income statement data for ${symbol}`);
         return incomeStatements;
 
     } catch (error) {
-        console.error(`Error fetching income statement data for ${symbol}:`, error);
-        return null;
+        if (error.name === 'VersionError' && retries < maxRetries - 1) {
+            console.log(`Retrying due to VersionError (attempt ${retries + 1} of ${maxRetries})`);
+            retries++;
+        } else {
+            console.error(`Error fetching income statement data for ${symbol}:`, error);
+            return null;
+        }
     }
+}
 }
 
 module.exports = {
-    fetchIncomeStatement
+fetchIncomeStatement
 };
