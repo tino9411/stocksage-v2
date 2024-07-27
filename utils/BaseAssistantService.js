@@ -9,7 +9,33 @@ class BaseAssistantService {
             apiKey: this.apiKey,
         });
         this.dbConnected = false;
+        this.logs = [];
+        this.systemLogs = [];
     }
+
+    addSystemLog(log) {
+        const formattedLog = `[${new Date().toISOString()}] ${log}`;
+        this.systemLogs.push(formattedLog);
+        console.log(formattedLog); // Keep console logging for server-side visibility
+      }
+
+    getSystemLogs() {
+        return this.systemLogs;
+      }
+    
+    clearSystemLogs() {
+        this.systemLogs = [];
+      }
+
+    addLog(log) {
+        this.logs.push(log);
+        console.log(log); // Still log to console for server-side visibility
+    }
+
+    getLogs() {
+        return this.logs;
+    }
+
 
     async ensureDBConnection() {
         if (!this.dbConnected) {
@@ -215,41 +241,44 @@ class BaseAssistantService {
     }
 
     async handleRunStatus(thread_id, run) {
-        console.log('Handling run status...');
+        this.addSystemLog(`Handling run status: ${run.status}`);
         while (true) {
-            console.log(`Current run status: ${run.status}`);
-            switch (run.status) {
-                case 'queued':
-                case 'in_progress':
-                    await new Promise(resolve => setTimeout(resolve, 1000));
-                    run = await this.client.beta.threads.runs.retrieve(thread_id, run.id);
-                    break;
-                case 'requires_action':
-                    run = await this.handleRequiresAction(thread_id, run);
-                    break;
-                case 'completed':
-                    console.log('Run completed. Retrieving messages...');
-                    const messages = await this.listMessages(thread_id);
-                    const assistantMessages = messages.filter(message => message.role === 'assistant');
-                    if (assistantMessages.length > 0) {
-                        const latestMessage = assistantMessages[0].content[0].text.value;
-                        console.log('Assistant response:', latestMessage);
-                        return latestMessage;
-                    } else {
-                        console.log('No assistant messages found');
-                        return null;
-                    }
-                case 'failed':
-                case 'cancelled':
-                case 'expired':
-                    console.error(`Run ended with status: ${run.status}`);
-                    return null;
-                default:
-                    console.error(`Unknown run status: ${run.status}`);
-                    return null;
-            }
+          switch (run.status) {
+            case 'queued':
+            case 'in_progress':
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              run = await this.client.beta.threads.runs.retrieve(thread_id, run.id);
+              this.addSystemLog(`Run status updated: ${run.status}`);
+              break;
+            case 'requires_action':
+              run = await this.handleRequiresAction(thread_id, run);
+              break;
+            case 'completed':
+              this.addSystemLog('Run completed. Retrieving messages...');
+              const steps = await this.getRunSteps(thread_id, run.id);
+              this.logRunSteps(steps);
+              const messages = await this.listMessages(thread_id);
+              const assistantMessages = messages.filter(message => message.role === 'assistant');
+              if (assistantMessages.length > 0) {
+                const latestMessage = assistantMessages[0].content[0].text.value;
+                this.addSystemLog('Assistant response received');
+                return latestMessage;
+              } else {
+                this.addSystemLog('No assistant messages found');
+                return null;
+              }
+            case 'failed':
+            case 'cancelled':
+            case 'expired':
+              this.addSystemLog(`Run ended with status: ${run.status}`);
+              return null;
+            default:
+              this.addSystemLog(`Unknown run status: ${run.status}`);
+              return null;
+          }
         }
-    }
+      }
+    
 
     async handleRequiresAction(thread_id, run) {
         // This method should be implemented by subclasses
@@ -257,33 +286,61 @@ class BaseAssistantService {
     }
 
     async chatWithAssistant(thread_id, assistant_id, userMessage) {
-        console.log(`Starting chat with assistant ${assistant_id} in thread ${thread_id}`);
+        console.log(`\x1b[34m[Chat Started]\x1b[0m Assistant: ${assistant_id}, Thread: ${thread_id}`);
         try {
             await this.createMessage(thread_id, {
                 role: 'user',
                 content: userMessage,
             });
-            console.log('User message added to thread');
-
+    
             let run = await this.client.beta.threads.runs.create(thread_id, {
                 assistant_id,
                 instructions: "Please respond to the user's message.",
             });
-
+    
+            console.log(`\x1b[34m[Run Created]\x1b[0m Run ID: ${run.id}`);
+    
             const response = await this.handleRunStatus(thread_id, run);
             
             if (response) {
-                console.log('Assistant response:', response);
+                console.log('\x1b[32m[Assistant Responded]\x1b[0m');
                 return response;
             } else {
-                console.log('No assistant response found');
+                console.log('\x1b[31m[No Response]\x1b[0m');
                 return null;
             }
         } catch (error) {
-            console.error('Error in chatWithAssistant:', error);
+            console.error('\x1b[31m[Error]\x1b[0m', error);
             throw error;
         }
     }
-}
 
-module.exports = BaseAssistantService;
+    async getRunSteps(thread_id, run_id) {
+        try {
+            const steps = await this.client.beta.threads.runs.steps.list(thread_id, run_id);
+            return steps.data;
+        } catch (error) {
+            console.error('Error retrieving run steps:', error);
+            return [];
+        }
+    }
+
+    
+    logRunSteps(steps) {
+        this.addSystemLog('Run Steps:');
+        steps.forEach((step, index) => {
+          this.addSystemLog(`Step ${index + 1}: ${step.type} - ${step.status}`);
+          if (step.step_details && step.step_details.tool_calls) {
+            step.step_details.tool_calls.forEach(call => {
+              this.addSystemLog(`Tool: ${call.type}`);
+              if (call.function) {
+                this.addSystemLog(`Function: ${call.function.name}`);
+                this.addSystemLog(`Arguments: ${call.function.arguments}`);
+              }
+            });
+          }
+        });
+      }
+    }
+    
+    module.exports = BaseAssistantService;

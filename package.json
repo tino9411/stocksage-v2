@@ -3,16 +3,17 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-  "start": "node server.js",
-  "client": "echo Starting client in directory: $PWD && cd client && npm start",
-  "server": "nodemon server.js",
-  "dev": "concurrently \"npm run server\" \"npm run client\""
-},
+    "start": "node server.js",
+    "client": "echo Starting client in directory: $PWD && cd client && npm start",
+    "server": "nodemon server.js",
+    "dev": "concurrently \"npm run server\" \"npm run client\""
+  },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "ansi_up": "^6.0.2",
     "axios": "^1.7.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",

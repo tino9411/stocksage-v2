@@ -3,7 +3,6 @@ const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
 const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 
-
 class MainAssistantService extends BaseAssistantService {
     constructor(apiKey) {
         super(apiKey);
@@ -28,6 +27,7 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     async initialize({ model, name }) {
+        this.addSystemLog('Initializing Main Assistant');
         const messageSubAssistantTool = {
             type: "function",
             function: {
@@ -58,23 +58,23 @@ class MainAssistantService extends BaseAssistantService {
             tools: [messageSubAssistantTool]
         });
         this.assistantId = newAssistant.id;
-        console.log('Main Assistant initialized:', newAssistant);
+        this.addSystemLog('Main Assistant initialized');
     
-        // Initialize CompanyProfile sub-assistant
+        // Initialize sub-assistants
+        this.addSystemLog('Initializing Sub-assistants');
         this.subAssistants.CompanyProfile = new CompanyProfileAssistant(this.apiKey);
         await this.subAssistants.CompanyProfile.initialize({ model, name: "CompanyProfile" });
-    
-        // Initialize FinancialAnalysis sub-assistant
+        
         this.subAssistants.FinancialAnalysis = new FinancialAnalysisAssistant(this.apiKey);
         await this.subAssistants.FinancialAnalysis.initialize({ model, name: "FinancialAnalysis" });
 
-        // Initialize TechnicalAnalysis sub-assistant
         this.subAssistants.TechnicalAnalysis = new TechnicalAnalysisAssistant(this.apiKey);
         await this.subAssistants.TechnicalAnalysis.initialize({ model, name: "TechnicalAnalysis" });
+        
+        this.addSystemLog('All sub-assistants initialized');
     }
-
     async handleRequiresAction(thread_id, run) {
-        console.log('Handling required action...');
+        this.addSystemLog('Handling required action');
         if (
             run.required_action &&
             run.required_action.submit_tool_outputs &&
@@ -119,7 +119,7 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     async messageSubAssistant(subAssistantName, message) {
-        console.log(`Attempting to message sub-assistant: ${subAssistantName}`);
+        this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
         const subAssistant = this.subAssistants[subAssistantName];
         if (!subAssistant) {
             console.error(`Sub-assistant ${subAssistantName} not found`);
@@ -184,7 +184,7 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     async deleteAllAssistants() {
-        console.log('Deleting main assistant...');
+        this.addSystemLog('Deleting Main assistant');
         if (this.assistantId) {
           try {
             await this.client.beta.assistants.del(this.assistantId);
@@ -208,8 +208,20 @@ class MainAssistantService extends BaseAssistantService {
           }
         }
       
-        console.log('All assistants deleted');
+        this.addSystemLog('All assistants deleted');
       }
+
+      // Ensure getSystemLogs is explicitly defined in MainAssistantService
+  getSystemLogs() {
+    return super.getSystemLogs();
+  }
+
+  // Add a method to clear logs after retrieving them
+  getAndClearSystemLogs() {
+    const logs = this.getSystemLogs();
+    this.clearSystemLogs();
+    return logs;
+  }
 }
 
 module.exports = MainAssistantService;
