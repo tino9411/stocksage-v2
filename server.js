@@ -3,9 +3,9 @@ const cors = require('cors');
 const path = require('path');
 const chatRouter = require('./routes/chat');
 require('dotenv').config();
-
 const connectDB = require('./config/db');
-const executeService = require('./utils/serviceExecutor');  // Import the service executor
+const executeService = require('./utils/serviceExecutor');
+const Chat = require('./services/chat');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -16,6 +16,9 @@ app.use(express.json());
 
 // Connect to MongoDB
 connectDB();
+
+// Create a chat instance
+const chat = new Chat(process.env.OPENAI_API_KEY);
 
 // Routes
 const stockRoutes = require('./routes/stock');
@@ -43,6 +46,33 @@ app.get('*', (req, res) => {
     res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
 });
+
+// Graceful shutdown function
+async function gracefulShutdown() {
+    console.log('Shutting down gracefully...');
+    
+    // Delete the main assistant and all sub-assistants
+    if (chat.mainAssistant) {
+        console.log('Deleting assistants...');
+        await chat.mainAssistant.deleteAllAssistants();
+    }
+
+    // Close the server
+    server.close(() => {
+        console.log('Server closed');
+        process.exit(0);
+    });
+
+    // If server hasn't finished in 10 seconds, shut down forcefully
+    setTimeout(() => {
+        console.error('Could not close connections in time, forcefully shutting down');
+        process.exit(1);
+    }, 10000);
+}
+
+// Listen for shutdown signals
+process.on('SIGTERM', gracefulShutdown);
+process.on('SIGINT', gracefulShutdown);

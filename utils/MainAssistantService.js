@@ -182,6 +182,24 @@ class MainAssistantService extends BaseAssistantService {
             };
         }
     }
+
+    async deleteAllAssistants() {
+        console.log('Deleting main assistant...');
+        if (this.assistantId) {
+            await this.deleteAssistant(this.assistantId);
+            this.assistantId = null;
+        }
+
+        console.log('Deleting sub-assistants...');
+        for (const [name, assistant] of Object.entries(this.subAssistants)) {
+            if (assistant.assistantId) {
+                await assistant.deleteAssistant(assistant.assistantId);
+                assistant.assistantId = null;
+            }
+        }
+
+        console.log('All assistants deleted');
+    }
 }
 
 module.exports = MainAssistantService;
