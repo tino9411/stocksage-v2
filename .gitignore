@@ -1,3 +1,32 @@
-.env/client
+# Node modules
+node_modules/
+client/node_modules/
+
+# Environment variables
+.env
+client/.env
+
+# MacOS system files
 .DS_Store
-node_modules
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Dependency directories
+**/node_modules/
+
+# Build directories
+build/
+client/build/
+
+# Other
+.vscode/
+.idea/
+
+# React build files
+client/.cache/
+
+# Miscellaneous
+.DS_Store
