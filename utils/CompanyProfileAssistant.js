@@ -93,7 +93,7 @@ class CompanyProfileAssistant extends BaseAssistantService {
         return run;
     }
 
-    async processMessage(message, threadId) {
+    async processMessage(message, threadId, stream = false) {
         this.addSystemLog(`Processing message in CompanyProfileAssistant: ${message.content}`);
         try {
             await this.createMessage(threadId, {
@@ -103,9 +103,10 @@ class CompanyProfileAssistant extends BaseAssistantService {
 
             let run = await this.client.beta.threads.runs.create(threadId, {
                 assistant_id: this.assistantId,
+                stream: stream
             });
 
-            const response = await this.handleRunStatus(threadId, run);
+            const response = await this.handleRunStatus(threadId, run, stream);
             return response;
         } catch (error) {
             console.error('Error processing message in CompanyProfileAssistant:', error);

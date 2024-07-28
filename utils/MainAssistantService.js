@@ -118,7 +118,7 @@ class MainAssistantService extends BaseAssistantService {
         return run;
     }
 
-    async messageSubAssistant(subAssistantName, message) {
+    async messageSubAssistant(subAssistantName, message, stream = false) {
         this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
         const subAssistant = this.subAssistants[subAssistantName];
         if (!subAssistant) {
@@ -128,7 +128,6 @@ class MainAssistantService extends BaseAssistantService {
 
         let threadId = this.subAssistantThreads[subAssistantName];
         if (!threadId) {
-            // Create a new thread for this sub-assistant if it doesn't exist
             const newThread = await this.createThread({ metadata: { subAssistant: subAssistantName } });
             threadId = newThread.id;
             this.subAssistantThreads[subAssistantName] = threadId;
@@ -149,8 +148,7 @@ class MainAssistantService extends BaseAssistantService {
         this.addSystemLog(`Inter-assistant message: ${JSON.stringify(formattedMessage)}`);
 
         try {
-            // Process the message with the sub-assistant
-            const response = await subAssistant.processMessage(formattedMessage, threadId);
+            const response = await subAssistant.processMessage(formattedMessage, threadId, stream);
 
             const formattedResponse = {
                 sender: {
@@ -183,6 +181,25 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 
+    async processMessage(message, threadId, stream = false) {
+        this.addSystemLog(`Processing message in MainAssistant: ${message.content}`);
+        try {
+            await this.createMessage(threadId, {
+                role: 'user',
+                content: message.content,
+            });
+
+            if (stream) {
+                return this.streamRun(threadId);
+            } else {
+                return this.createRun(threadId);
+            }
+        } catch (error) {
+            console.error('Error processing message in MainAssistant:', error);
+            return `I apologize, but I encountered an error while processing your request. ${error.message}`;
+        }
+    }
+
     async deleteAllAssistants() {
         this.addSystemLog('Deleting Main assistant');
         if (this.assistantId) {
@@ -212,16 +229,16 @@ class MainAssistantService extends BaseAssistantService {
       }
 
       // Ensure getSystemLogs is explicitly defined in MainAssistantService
-  getSystemLogs() {
-    return super.getSystemLogs();
-  }
+    getSystemLogs() {
+        return super.getSystemLogs();
+    }
 
-  // Add a method to clear logs after retrieving them
-  getAndClearSystemLogs() {
-    const logs = this.getSystemLogs();
-    this.clearSystemLogs();
-    return logs;
-  }
+    // Add a method to clear logs after retrieving them
+    getAndClearSystemLogs() {
+        const logs = this.getSystemLogs();
+        this.clearSystemLogs();
+        return logs;
+    }
 }
 
 module.exports = MainAssistantService;

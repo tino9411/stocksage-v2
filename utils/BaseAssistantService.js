@@ -1,9 +1,11 @@
 //utils/BaseAssistantService.js
 const OpenAI = require('openai');
 const connectDB = require('../config/db');
+const { EventEmitter } = require('events');
 
-class BaseAssistantService {
+class BaseAssistantService extends EventEmitter {
     constructor(apiKey) {
+        super();
         this.apiKey = apiKey;
         this.client = new OpenAI({
             apiKey: this.apiKey,
@@ -240,8 +242,11 @@ class BaseAssistantService {
         throw new Error('processMessage must be implemented by subclass');
     }
 
-    async handleRunStatus(thread_id, run) {
+    async handleRunStatus(thread_id, run, stream) {
         this.addSystemLog(`Handling run status: ${run.status}`);
+        if (stream) {
+            return this.handleRunStatusStream(thread_id, run, this.assistantId);
+        }
         while (true) {
           switch (run.status) {
             case 'queued':
@@ -278,6 +283,65 @@ class BaseAssistantService {
           }
         }
       }
+
+      async handleRunStatusStream(thread_id, run_id) {
+        console.log(`\x1b[34m[Handling stream]\x1b[Assistant ID]: ${this.assistantId}, Thread: ${thread_id}`);
+        try {
+            const stream = await this.client.beta.threads.runs.stream({
+                thread_id: thread_id,
+                run_id: run_id,
+                assistant_id: this.assistantId
+            });
+
+      
+          stream.on('event', (event) => this.emit('event', event));
+          stream.on('runStepCreated', (runStep) => this.emit('runStepCreated', runStep));
+          stream.on('runStepDelta', (delta, snapshot) => this.emit('runStepDelta', delta, snapshot));
+          stream.on('runStepDone', (runStep) => this.emit('runStepDone', runStep));
+          stream.on('messageCreated', (message) => this.emit('messageCreated', message));
+          stream.on('messageDelta', (delta, snapshot) => this.emit('messageDelta', delta, snapshot));
+          stream.on('messageDone', (message) => this.emit('messageDone', message));
+          stream.on('textCreated', (content) => this.emit('textCreated', content));
+          stream.on('textDelta', (delta, snapshot) => this.emit('textDelta', delta, snapshot));
+          stream.on('textDone', (content, snapshot) => this.emit('textDone', content, snapshot));
+          stream.on('toolCallCreated', (toolCall) => this.emit('toolCallCreated', toolCall));
+          stream.on('toolCallDelta', (delta, snapshot) => this.emit('toolCallDelta', delta, snapshot));
+          stream.on('toolCallDone', (toolCall) => this.emit('toolCallDone', toolCall));
+          stream.on('end', () => this.emit('end'));
+      
+          for await (const event of stream) {
+            switch (event.type) {
+              case 'run_step':
+                if (event.data.status === 'in_progress') {
+                  this.emit('runStepInProgress', event.data);
+                } else if (event.data.status === 'completed') {
+                  this.emit('runStepCompleted', event.data);
+                }
+                break;
+              case 'message':
+                if (event.data.role === 'assistant') {
+                  this.emit('assistantMessage', event.data);
+                }
+                break;
+              case 'content':
+                if (event.data.type === 'text') {
+                  this.emit('textContent', event.data.text);
+                }
+                break;
+              case 'tool_call':
+                this.emit('toolCall', event.data);
+                break;
+              // Add more cases if needed for other event types
+            }
+          }
+      
+          return await stream.finalMessages();
+        } catch (error) {
+          console.error('Error in base assistant stream:', error);
+          this.emit('error', error);
+          throw error;
+        }
+      }
     
 
     async handleRequiresAction(thread_id, run) {
@@ -285,8 +349,9 @@ class BaseAssistantService {
         throw new Error('handleRequiresAction must be implemented by subclass');
     }
 
-    async chatWithAssistant(thread_id, assistant_id, userMessage) {
+    async chatWithAssistant(thread_id, assistant_id, userMessage, stream = false) {
         console.log(`\x1b[34m[Chat Started]\x1b[0m Assistant: ${assistant_id}, Thread: ${thread_id}`);
+        console.log(`\x1b[34m[Chat Started]\x1b[0m User: ${assistant_id}, Message: ${userMessage}`);
         try {
             await this.createMessage(thread_id, {
                 role: 'user',
@@ -300,20 +365,24 @@ class BaseAssistantService {
     
             console.log(`\x1b[34m[Run Created]\x1b[0m Run ID: ${run.id}`);
     
-            const response = await this.handleRunStatus(thread_id, run);
-            
-            if (response) {
-                console.log('\x1b[32m[Assistant Responded]\x1b[0m');
-                return response;
+            if (stream) {
+                return this.handleRunStatusStream(thread_id, run, assistant_id);
             } else {
-                console.log('\x1b[31m[No Response]\x1b[0m');
-                return null;
+                const response = await this.handleRunStatus(thread_id, run, false);
+                if (response) {
+                    console.log('\x1b[32m[Assistant Responded]\x1b[0m');
+                    return response;
+                } else {
+                    console.log('\x1b[31m[No Response]\x1b[0m');
+                    return null;
+                }
             }
         } catch (error) {
             console.error('\x1b[31m[Error]\x1b[0m', error);
             throw error;
         }
     }
+
 
     async getRunSteps(thread_id, run_id) {
         try {

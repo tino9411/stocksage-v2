@@ -11,7 +11,12 @@ const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: '*', // Be more specific in production
+    methods: ['GET', 'POST', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    credentials: true,
+  }));
 app.use(express.json());
 
 // Connect to MongoDB
@@ -29,13 +34,13 @@ app.use('/api/chat', chatRouter);
 
 // Route for dynamic service execution
 app.post('/api/executeService', async (req, res) => {
-    const { serviceName, params } = req.body;
-    try {
-        const result = await executeService(serviceName, ...params);
-        res.json(result);
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
+  const { serviceName, params } = req.body;
+  try {
+    const result = await executeService(serviceName, ...params);
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Serve static files from the React app
@@ -43,32 +48,32 @@ app.use(express.static(path.join(__dirname, 'client/build')));
 
 // The "catchall" handler: for any request that doesn't match one above, send back React's index.html file.
 app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
+  res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
 });
 
 const server = app.listen(port, () => {
-    console.log(`Server is running on port ${port}`);
+  console.log(`Server is running on port ${port}`);
 });
 
 // Graceful shutdown function
 async function gracefulShutdown() {
-    console.log('Shutting down gracefully...');
-    // Delete the main assistant, all sub-assistants, and threads
-    if (chat.mainAssistant) {
-      console.log('Deleting assistants and threads...');
-      await chat.endConversation();
-    }
-    // Close the server
-    server.close(() => {
-      console.log('Server closed');
-      process.exit(0);
-    });
-    // If server hasn't finished in 10 seconds, shut down forcefully
-    setTimeout(() => {
-      console.error('Could not close connections in time, forcefully shutting down');
-      process.exit(1);
-    }, 10000);
+  console.log('Shutting down gracefully...');
+  // Delete the main assistant, all sub-assistants, and threads
+  if (chat.mainAssistant) {
+    console.log('Deleting assistants and threads...');
+    await chat.endConversation();
   }
+  // Close the server
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
+  // If server hasn't finished in 10 seconds, shut down forcefully
+  setTimeout(() => {
+    console.error('Could not close connections in time, forcefully shutting down');
+    process.exit(1);
+  }, 10000);
+}
 
 // Listen for shutdown signals
 process.on('SIGTERM', gracefulShutdown);

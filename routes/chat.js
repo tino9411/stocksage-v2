@@ -1,3 +1,4 @@
+//routes/chat.js
 const express = require('express');
 const router = express.Router();
 const Chat = require('../services/chat');
@@ -58,6 +59,7 @@ const safeStringify = (obj) => {
   });
 };
 
+
 router.post('/initialize', async (req, res) => {
   try {
     const logs = await chat.initializeAssistant({
@@ -94,6 +96,85 @@ router.post('/message', async (req, res) => {
     res.status(500).json({ error: "Failed to send message" });
   }
 });
+
+router.post('/stream', async (req, res) => {
+  const { message } = req.body;
+  console.log('[/stream] Received message:', message);
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  let fullResponse = '';
+
+  try {
+    console.log('[/stream] Starting streamMessage');
+    await chat.streamMessage(message, (event) => {
+      console.log('[/stream] Received event:', event);
+      if (event.type === 'textDelta') {
+        fullResponse += event.data;
+        console.log('[/stream] Sending textDelta:', event.data);
+        res.write(`data: ${JSON.stringify({ type: 'textDelta', content: event.data })}\n\n`);
+      } else if (event.type === 'error') {
+        console.log('[/stream] Sending error:', event.data);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: event.data })}\n\n`);
+      } else if (event.type === 'end') {
+        console.log('[/stream] Sending end event. Full response:', fullResponse);
+        res.write(`data: ${JSON.stringify({ type: 'end', content: fullResponse })}\n\n`);
+        res.end();
+      } else {
+        console.log('[/stream] Sending other event:', event);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    });
+  } catch (error) {
+    console.error('[/stream] Error streaming message:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', content: error.message })}\n\n`);
+    res.end();
+  }
+});
+
+router.get('/stream', async (req, res) => {
+  const { message } = req.query;
+  console.log('[/stream] Received message:', message);
+
+  res.writeHead(200, {
+    'Content-Type': 'text/event-stream',
+    'Cache-Control': 'no-cache',
+    'Connection': 'keep-alive'
+  });
+
+  let fullResponse = '';
+
+  try {
+    console.log('[/stream] Starting streamMessage');
+    await chat.streamMessage(message, (event) => {
+      console.log('[/stream] Received event:', event);
+      if (event.type === 'textDelta') {
+        fullResponse += event.data;
+        console.log('[/stream] Sending textDelta:', event.data);
+        res.write(`data: ${JSON.stringify({ type: 'textDelta', content: event.data })}\n\n`);
+      } else if (event.type === 'error') {
+        console.log('[/stream] Sending error:', event.data);
+        res.write(`data: ${JSON.stringify({ type: 'error', content: event.data })}\n\n`);
+      } else if (event.type === 'end') {
+        console.log('[/stream] Sending end event. Full response:', fullResponse);
+        res.write(`data: ${JSON.stringify({ type: 'end', content: fullResponse })}\n\n`);
+        res.end();
+      } else {
+        console.log('[/stream] Sending other event:', event);
+        res.write(`data: ${JSON.stringify(event)}\n\n`);
+      }
+    });
+  } catch (error) {
+    console.error('[/stream] Error streaming message:', error);
+    res.write(`data: ${JSON.stringify({ type: 'error', content: error.message })}\n\n`);
+    res.end();
+  }
+});
+
 
 router.post('/end', async (req, res) => {
   try {
