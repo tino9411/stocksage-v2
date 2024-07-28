@@ -49,7 +49,7 @@ class CompanyProfileAssistant extends BaseAssistantService {
     }
 
     async handleRequiresAction(thread_id, run) {
-        console.log('Handling required action in CompanyProfileAssistant...');
+        this.addSystemLog('Handling required action in CompanyProfileAssistant...');
         if (
             run.required_action &&
             run.required_action.submit_tool_outputs &&
@@ -94,7 +94,7 @@ class CompanyProfileAssistant extends BaseAssistantService {
     }
 
     async processMessage(message, threadId) {
-        console.log(`Processing message in CompanyProfileAssistant: ${message.content}`);
+        this.addSystemLog(`Processing message in CompanyProfileAssistant: ${message.content}`);
         try {
             await this.createMessage(threadId, {
                 role: 'user',
