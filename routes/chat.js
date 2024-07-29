@@ -80,7 +80,7 @@ router.get('/stream', async (req, res) => {
           console.log('Received event:', event);
           switch (event.type) {
               case 'textDelta':
-                  sendSSE('message', { type: 'textDelta', content: event.data });
+                  sendSSE('message', { type: 'textDelta', content: event.data.value });
                   break;
               case 'textCreated':
                   sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });

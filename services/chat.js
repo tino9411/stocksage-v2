@@ -1,13 +1,16 @@
 const MainAssistantService = require('../utils/MainAssistantService');
 const OpenAI = require('openai');
+const EventEmitter = require('events');
 
-class Chat {
+class Chat extends EventEmitter{
     constructor(apiKey) {
+      super();
         this.apiKey = apiKey; // Store the API key
         this.mainAssistant = null; // Placeholder for the main assistant instance
         this.threadId = null; // Placeholder for the thread ID
         this.isInitialized = false; // Flag to check if the assistant is initialized
         this.isConversationStarted = false; // Flag to check if a conversation has started
+        this.currentStream = null;
     }
 
     // Initialize the assistant with the given model and name
@@ -65,6 +68,26 @@ class Chat {
         }
     }
 
+    observeStream(stream) {
+      this.currentStream = stream;
+      
+      stream.on('textDelta', (delta) => {
+          this.emit('textDelta', delta);
+      });
+
+      stream.on('end', () => {
+          const currentRun = stream.run;
+          if (currentRun.status === "requires_action" &&
+              currentRun.required_action.type === "submit_tool_outputs") {
+              const toolCalls = currentRun.required_action.submit_tool_outputs.tool_calls;
+              this.emit('requiresAction', { runId: currentRun.id, toolCalls });
+          }
+          this.emit('end');
+      });
+
+      return stream.finalMessages();
+  }
+
     // Stream messages in real-time
     async streamMessage(userMessage, onEvent) {
       console.log('[streamMessage] Starting with message:', userMessage);
@@ -78,9 +101,21 @@ class Chat {
           });
 
           const { assistantId, threadId } = this.getStreamParameters();
-          const stream = await this.mainAssistant.client.beta.threads.runs.createAndStream(threadId, { assistant_id: assistantId });
+          const stream = await this.mainAssistant.client.beta.threads.runs.createAndStream(
+              threadId,
+              { assistant_id: assistantId }
+          );
 
-          await this.handleStreamEvents(stream, onEvent, threadId, assistantId);
+          this.observeStream(stream);
+
+          // Set up event listeners
+          this.on('textDelta', (delta) => onEvent({ type: 'textDelta', data: delta }));
+          this.on('requiresAction', (data) => this.handleToolCalls(threadId, data.toolCalls, data.runId, onEvent));
+          this.on('end', () => onEvent({ type: 'end' }));
+
+          const finalMessages = await stream.finalMessages();
+          console.log('[streamMessage] Final messages:', finalMessages);
+
       } catch (error) {
           console.error('[streamMessage] Error:', error);
           onEvent({ type: 'error', data: error.message });
@@ -102,20 +137,25 @@ class Chat {
 
     // Handle events during the stream
     async handleStreamEvents(stream, onEvent, threadId, assistantId) {
-      for await (const chunk of stream) {
-          console.log('[handleStreamEvents] Received chunk:', JSON.stringify(chunk));
-          
-          if (chunk.event === 'thread.message.delta') {
-              if (chunk.data.content && chunk.data.content[0] && chunk.data.content[0].type === 'text') {
-                  const contentDelta = chunk.data.content[0].text.value;
-                  console.log('[handleStreamEvents] Content delta:', contentDelta);
-                  onEvent({ type: 'textDelta', data: contentDelta });
-              }
-          } else if (chunk.event === 'thread.run.requires_action') {
-              await this.handleRunRequiresAction(chunk, onEvent, threadId);
-          } else if (chunk.event === 'thread.run.completed') {
-              console.log('[handleStreamEvents] Run completed');
-              onEvent({ type: 'end' });
+      let isMessageComplete = false;
+
+      for await (const event of stream) {
+          switch (event.event) {
+              case 'thread.message.delta':
+                  this.handleTextDelta(event, onEvent);
+                  break;
+              case 'thread.message.completed':
+                  isMessageComplete = true;
+                  onEvent({ type: 'textCreated', data: event.data });
+                  break;
+              case 'thread.run.requires_action':
+                  await this.handleRunRequiresAction(event, onEvent, threadId);
+                  break;
+              case 'thread.run.completed':
+                  await this.handleRunCompleted(onEvent, threadId, isMessageComplete);
+                  break;
+              default:
+                  break;
           }
       }
 
@@ -177,36 +217,22 @@ class Chat {
           }));
 
           console.log('[handleToolCalls] Submitting tool outputs and starting stream');
-          const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputs(
+          const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(
               threadId,
               runId,
-              { 
-                  tool_outputs: toolOutputs,
-                  stream: true
-              }
+              { tool_outputs: toolOutputs }
           );
 
-          for await (const chunk of stream) {
-              console.log('[handleToolCalls] Received chunk:', JSON.stringify(chunk));
-              if (chunk.event === 'thread.message.delta') {
-                  if (chunk.data.content && chunk.data.content[0] && chunk.data.content[0].type === 'text') {
-                      const contentDelta = chunk.data.content[0].text.value;
-                      console.log('[handleToolCalls] Content delta:', contentDelta);
-                      onEvent({ type: 'textDelta', data: contentDelta });
-                  }
-              } else if (chunk.event === 'thread.run.completed') {
-                  console.log('[handleToolCalls] Run completed');
-                  onEvent({ type: 'end' });
-              }
-          }
+          this.observeStream(stream);
 
-          console.log('[handleToolCalls] Tool call stream completed');
+          // The event listeners are already set up in streamMessage, so we don't need to set them up again here
+
       } catch (error) {
           console.error('[handleToolCalls] Error handling tool calls:', error);
           onEvent({ type: 'error', data: error.message });
       }
   }
-  
+
   async waitForRunCompletion(threadId, runId) {
     let run;
     do {
