@@ -1,4 +1,6 @@
+//server.js
 const express = require('express');
+const compression = require('compression');
 const cors = require('cors');
 const path = require('path');
 const chatRouter = require('./routes/chat');
@@ -17,6 +19,8 @@ app.use(cors({
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
 }));
+
+app.use(compression());
 
 app.use(express.json());
 

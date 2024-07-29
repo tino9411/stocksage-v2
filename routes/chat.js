@@ -65,6 +65,8 @@ router.get('/stream', async (req, res) => {
       console.log(`Sending event: ${event} with data:`, data);
       res.write(`event: ${event}\n`);
       res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.flush(); // Ensure the data is sent immediately
+
     };
 
     const keepAlive = setInterval(() => {
