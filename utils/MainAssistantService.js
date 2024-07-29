@@ -97,7 +97,66 @@ class MainAssistantService extends BaseAssistantService {
         this.logSystemEvent(`Sub-assistant ${name} initialized`); // Log that the sub-assistant is initialized
     }
 
-    // Override the handleRequiresAction method from BaseAssistantService
+    async chatWithAssistant(thread_id, assistant_id, userMessage, stream = false) {
+        // Call the base class implementation first
+        const baseResponse = await super.chatWithAssistant(thread_id, assistant_id, userMessage, stream);
+
+        // If streaming is enabled, return the base response as is
+        if (stream) {
+            return baseResponse;
+        }
+
+        // For non-streaming responses, check if we need to process sub-assistant responses
+        if (baseResponse) {
+            // Check if the response contains any indicators that sub-assistant information is needed
+            if (this.responseRequiresSubAssistant(baseResponse)) {
+                const enhancedResponse = await this.enhanceResponseWithSubAssistantInfo(baseResponse, thread_id);
+                return enhancedResponse;
+            }
+        }
+
+        return baseResponse;
+    }
+
+    responseRequiresSubAssistant(response) {
+        // Implement logic to determine if the response needs sub-assistant input
+        // This could be based on keywords, specific phrases, or other criteria
+        const subAssistantKeywords = ['company profile', 'financial analysis', 'technical analysis'];
+        return subAssistantKeywords.some(keyword => response.toLowerCase().includes(keyword));
+    }
+
+    async enhanceResponseWithSubAssistantInfo(baseResponse, thread_id) {
+        let enhancedResponse = baseResponse;
+
+        // Determine which sub-assistant(s) to call based on the content of the response
+        const subAssistantsToCall = this.determineRequiredSubAssistants(baseResponse);
+
+        for (const subAssistant of subAssistantsToCall) {
+            const subAssistantResponse = await this.messageSubAssistant(subAssistant, baseResponse);
+            enhancedResponse = this.incorporateSubAssistantResponse(enhancedResponse, subAssistantResponse, subAssistant);
+        }
+
+        // Create a new message in the thread with the enhanced response
+        await this.createMessage(thread_id, {
+            role: 'assistant',
+            content: enhancedResponse,
+        });
+
+        return enhancedResponse;
+    }
+
+    determineRequiredSubAssistants(response) {
+        const subAssistants = [];
+        if (response.toLowerCase().includes('company profile')) subAssistants.push('CompanyProfile');
+        if (response.toLowerCase().includes('financial analysis')) subAssistants.push('FinancialAnalysis');
+        if (response.toLowerCase().includes('technical analysis')) subAssistants.push('TechnicalAnalysis');
+        return subAssistants;
+    }
+
+    incorporateSubAssistantResponse(mainResponse, subResponse, subAssistantName) {
+        return `${mainResponse}\n\nAdditional information from ${subAssistantName}:\n${subResponse}`;
+    }
+
     async handleRequiresAction(thread_id, run) {
         this.logSystemEvent('Handling required action in MainAssistantService...');
         if (run.required_action && run.required_action.submit_tool_outputs) {
@@ -107,7 +166,6 @@ class MainAssistantService extends BaseAssistantService {
         return run;
     }
 
-    // New method to execute tool calls
     async executeToolCalls(toolCalls) {
         return await Promise.all(toolCalls.map(async (tool) => {
             const result = await this.executeToolCall(tool);
@@ -115,7 +173,6 @@ class MainAssistantService extends BaseAssistantService {
         }));
     }
 
-    // Modify the existing executeToolCall method
     async executeToolCall(toolCall) {
         const { id, function: { name, arguments: args } } = toolCall;
         const parsedArgs = JSON.parse(args);
@@ -131,7 +188,6 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 
-    // New method to create tool output
     createToolOutput(tool_call_id, result) {
         return {
             tool_call_id,
@@ -139,7 +195,6 @@ class MainAssistantService extends BaseAssistantService {
         };
     }
 
-    // New method to submit tool outputs
     async submitToolOutputs(thread_id, run_id, toolOutputs) {
         try {
             await this.client.beta.threads.runs.submitToolOutputs(
@@ -155,7 +210,6 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 
-    // Modify the existing messageSubAssistant method to return the content directly
     async messageSubAssistant(subAssistantName, message) {
         this.logSystemEvent(`Messaging Sub-assistant: ${subAssistantName}`);
 
@@ -174,13 +228,12 @@ class MainAssistantService extends BaseAssistantService {
         try {
             const response = await subAssistant.processMessage(formattedMessage, threadId);
             this.logSystemEvent(`Received response from Sub-assistant ${subAssistantName}: ${JSON.stringify(response)}`);
-            return response; // Return the response content directly
+            return response;
         } catch (error) {
             console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
             return `Error: Unable to process message. ${error.message}`;
         }
     }
-
 
     // Method to create a new thread for a sub-assistant
     async createNewThread(subAssistantName) {
@@ -247,7 +300,7 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     // Method to delete a specific assistant
-async deleteAssistant(assistantId, name = '') {
+    async deleteAssistant(assistantId, name = '') {
     if (assistantId) {
         try {
             await this.client.beta.assistants.del(assistantId); // Delete the assistant using the API
