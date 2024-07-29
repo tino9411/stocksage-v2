@@ -243,46 +243,48 @@ class BaseAssistantService extends EventEmitter {
     }
 
     async handleRunStatus(thread_id, run, stream) {
-        this.addSystemLog(`Handling run status: ${run.status}`);
+        this.addSystemLog(`Handling run status: ${run ? run.status : 'undefined'}`);
         if (stream) {
             return this.handleRunStatusStream(thread_id, run, this.assistantId);
         }
-        while (true) {
-          switch (run.status) {
-            case 'queued':
-            case 'in_progress':
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              run = await this.client.beta.threads.runs.retrieve(thread_id, run.id);
-              this.addSystemLog(`Run status updated: ${run.status}`);
-              break;
-            case 'requires_action':
-              run = await this.handleRequiresAction(thread_id, run);
-              break;
-            case 'completed':
-              this.addSystemLog('Run completed. Retrieving messages...');
-              const steps = await this.getRunSteps(thread_id, run.id);
-              this.logRunSteps(steps);
-              const messages = await this.listMessages(thread_id);
-              const assistantMessages = messages.filter(message => message.role === 'assistant');
-              if (assistantMessages.length > 0) {
-                const latestMessage = assistantMessages[0].content[0].text.value;
-                this.addSystemLog('Assistant response received');
-                return latestMessage;
-              } else {
-                this.addSystemLog('No assistant messages found');
-                return null;
-              }
-            case 'failed':
-            case 'cancelled':
-            case 'expired':
-              this.addSystemLog(`Run ended with status: ${run.status}`);
-              return null;
-            default:
-              this.addSystemLog(`Unknown run status: ${run.status}`);
-              return null;
-          }
+        while (run) {
+            switch (run.status) {
+                case 'queued':
+                case 'in_progress':
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    run = await this.client.beta.threads.runs.retrieve(thread_id, run.id);
+                    this.addSystemLog(`Run status updated: ${run.status}`);
+                    break;
+                case 'requires_action':
+                    run = await this.handleRequiresAction(thread_id, run);
+                    break;
+                case 'completed':
+                    this.addSystemLog('Run completed. Retrieving messages...');
+                    const steps = await this.getRunSteps(thread_id, run.id);
+                    this.logRunSteps(steps);
+                    const messages = await this.listMessages(thread_id);
+                    const assistantMessages = messages.filter(message => message.role === 'assistant');
+                    if (assistantMessages.length > 0) {
+                        const latestMessage = assistantMessages[0].content[0].text.value;
+                        this.addSystemLog('Assistant response received');
+                        return latestMessage;
+                    } else {
+                        this.addSystemLog('No assistant messages found');
+                        return null;
+                    }
+                case 'failed':
+                case 'cancelled':
+                case 'expired':
+                    this.addSystemLog(`Run ended with status: ${run.status}`);
+                    return null;
+                default:
+                    this.addSystemLog(`Unknown run status: ${run.status}`);
+                    return null;
+            }
         }
-      }
+        this.addSystemLog('Run object is undefined');
+        return null;
+    }
 
     async handleRunStatusStream(thread_id, run_id) {
         console.log(`\x1b[34m[Handling stream]\x1b[Assistant ID]: ${this.assistantId}, Thread: ${thread_id}`);

@@ -70,7 +70,10 @@ async function fetchCompanyProfile(symbol) {
         await stock.save();
         console.log(`Company profile for ${symbol} saved to database.`);
 
-        return stock;
+        const test = "Test string to see if tool works";
+
+        //return stock;
+        return test;
 
     } catch (error) {
         console.error(`Error fetching company profile for ${symbol}:`, error);

@@ -1,16 +1,24 @@
+// Importing the base service and sub-assistant classes
 const BaseAssistantService = require('./BaseAssistantService');
 const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
 const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 
+// Define the MainAssistantService class, extending the BaseAssistantService
 class MainAssistantService extends BaseAssistantService {
+    // Constructor to initialize the MainAssistantService instance
     constructor(apiKey) {
-        super(apiKey);
-        this.assistantId = null;
-        this.assistantName = 'MainAssistant';
-        this.subAssistants = {};
-        this.subAssistantThreads = {};
-        this.instructions = `You are the main stock and financial analyst. Your role is to analyze stock data and provide insightful reports.
+        super(apiKey); // Call the parent class constructor
+        this.assistantId = null; // Store the main assistant's ID
+        this.assistantName = 'MainAssistant'; // Name of the main assistant
+        this.subAssistants = {}; // Object to store sub-assistants
+        this.subAssistantThreads = {}; // Object to store threads for sub-assistants
+        this.instructions = this.getInstructions(); // Instructions for the main assistant
+    }
+
+    // Method to get instructions for the main assistant
+    getInstructions() {
+        return `You are the main stock and financial analyst. Your role is to analyze stock data and provide insightful reports.
         You have access to various financial data and metrics for stocks. When asked about a specific stock,
         you should retrieve the necessary data, process it, and provide a comprehensive analysis.
         Your analysis should include:
@@ -26,9 +34,29 @@ class MainAssistantService extends BaseAssistantService {
         Be conversational and engaging in your responses. Remember the context of the ongoing conversation.`;
     }
 
+    // Method to initialize the main assistant and its sub-assistants
     async initialize({ model, name }) {
-        this.addSystemLog('Initializing Main Assistant');
-        const messageSubAssistantTool = {
+        this.logSystemEvent('Initializing Main Assistant'); // Log the initialization process
+        await this.initializeMainAssistant(model, name); // Initialize the main assistant
+        await this.initializeSubAssistants(model); // Initialize the sub-assistants
+    }
+
+    // Method to initialize the main assistant
+    async initializeMainAssistant(model, name) {
+        const messageSubAssistantTool = this.getMessageSubAssistantTool(); // Get the tool for messaging sub-assistants
+        const newAssistant = await this.createAssistant({
+            model,
+            name,
+            instructions: this.instructions,
+            tools: [messageSubAssistantTool]
+        });
+        this.assistantId = newAssistant.id; // Store the main assistant's ID
+        this.logSystemEvent('Main Assistant initialized'); // Log that the main assistant is initialized
+    }
+
+    // Method to get the tool for messaging sub-assistants
+    getMessageSubAssistantTool() {
+        return {
             type: "function",
             function: {
                 name: "messageSubAssistant",
@@ -50,44 +78,87 @@ class MainAssistantService extends BaseAssistantService {
                 }
             }
         };
-    
-        const newAssistant = await this.createAssistant({
-            model,
-            name,
-            instructions: this.instructions,
-            tools: [messageSubAssistantTool]
-        });
-        this.assistantId = newAssistant.id;
-        this.addSystemLog('Main Assistant initialized');
-    
-        // Initialize sub-assistants
-        this.addSystemLog('Initializing Sub-assistants');
-        this.subAssistants.CompanyProfile = new CompanyProfileAssistant(this.apiKey);
-        await this.subAssistants.CompanyProfile.initialize({ model, name: "CompanyProfile" });
-        
-        this.subAssistants.FinancialAnalysis = new FinancialAnalysisAssistant(this.apiKey);
-        await this.subAssistants.FinancialAnalysis.initialize({ model, name: "FinancialAnalysis" });
-
-        this.subAssistants.TechnicalAnalysis = new TechnicalAnalysisAssistant(this.apiKey);
-        await this.subAssistants.TechnicalAnalysis.initialize({ model, name: "TechnicalAnalysis" });
-        
-        this.addSystemLog('All sub-assistants initialized');
     }
 
+    // Method to initialize all sub-assistants
+    async initializeSubAssistants(model) {
+        this.logSystemEvent('Initializing Sub-assistants'); // Log the initialization of sub-assistants
+        await this.initializeSubAssistant('CompanyProfile', CompanyProfileAssistant, model);
+        await this.initializeSubAssistant('FinancialAnalysis', FinancialAnalysisAssistant, model);
+        await this.initializeSubAssistant('TechnicalAnalysis', TechnicalAnalysisAssistant, model);
+        this.logSystemEvent('All sub-assistants initialized'); // Log that all sub-assistants are initialized
+    }
+
+    // Method to initialize a specific sub-assistant
+    async initializeSubAssistant(name, AssistantClass, model) {
+        const assistant = new AssistantClass(this.apiKey); // Create an instance of the sub-assistant
+        await assistant.initialize({ model, name }); // Initialize the sub-assistant
+        this.subAssistants[name] = assistant; // Store the sub-assistant in the subAssistants object
+        this.logSystemEvent(`Sub-assistant ${name} initialized`); // Log that the sub-assistant is initialized
+    }
+
+    // Override the handleRequiresAction method from BaseAssistantService
+    async handleRequiresAction(thread_id, run) {
+        this.logSystemEvent('Handling required action in MainAssistantService...');
+        if (run.required_action && run.required_action.submit_tool_outputs) {
+            const toolOutputs = await this.executeToolCalls(run.required_action.submit_tool_outputs.tool_calls);
+            return await this.submitToolOutputs(thread_id, run.id, toolOutputs);
+        }
+        return run;
+    }
+
+    // New method to execute tool calls
+    async executeToolCalls(toolCalls) {
+        return await Promise.all(toolCalls.map(async (tool) => {
+            const result = await this.executeToolCall(tool);
+            return this.createToolOutput(tool.id, result);
+        }));
+    }
+
+    // Modify the existing executeToolCall method
     async executeToolCall(toolCall) {
-        const { function: { name, arguments: args } } = toolCall;
+        const { id, function: { name, arguments: args } } = toolCall;
         const parsedArgs = JSON.parse(args);
+        this.logSystemEvent(`Executing tool call: ${name} with arguments: ${JSON.stringify(parsedArgs)}`);
 
         switch (name) {
             case 'messageSubAssistant':
-                return await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
+                const response = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
+                this.logSystemEvent(`Tool call response: ${JSON.stringify(response)}`);
+                return response;
             default:
                 throw new Error(`Unknown function ${name}`);
         }
     }
 
+    // New method to create tool output
+    createToolOutput(tool_call_id, result) {
+        return {
+            tool_call_id,
+            output: JSON.stringify(result),
+        };
+    }
+
+    // New method to submit tool outputs
+    async submitToolOutputs(thread_id, run_id, toolOutputs) {
+        try {
+            await this.client.beta.threads.runs.submitToolOutputs(
+                thread_id,
+                run_id,
+                { tool_outputs: toolOutputs },
+            );
+            this.logSystemEvent("Tool outputs submitted successfully.");
+            return await this.client.beta.threads.runs.retrieve(thread_id, run_id);
+        } catch (error) {
+            console.error("Error submitting tool outputs:", error);
+            throw error;
+        }
+    }
+
+    // Modify the existing messageSubAssistant method to return the content directly
     async messageSubAssistant(subAssistantName, message) {
-        this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
+        this.logSystemEvent(`Messaging Sub-assistant: ${subAssistantName}`);
+
         const subAssistant = this.subAssistants[subAssistantName];
         if (!subAssistant) {
             throw new Error(`Sub-assistant ${subAssistantName} not found`);
@@ -95,12 +166,33 @@ class MainAssistantService extends BaseAssistantService {
 
         let threadId = this.subAssistantThreads[subAssistantName];
         if (!threadId) {
-            const newThread = await this.createThread({ metadata: { subAssistant: subAssistantName } });
-            threadId = newThread.id;
-            this.subAssistantThreads[subAssistantName] = threadId;
+            threadId = await this.createNewThread(subAssistantName);
         }
 
-        const formattedMessage = {
+        const formattedMessage = this.formatMessage(message, subAssistant);
+
+        try {
+            const response = await subAssistant.processMessage(formattedMessage, threadId);
+            this.logSystemEvent(`Received response from Sub-assistant ${subAssistantName}: ${JSON.stringify(response)}`);
+            return response; // Return the response content directly
+        } catch (error) {
+            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
+            return `Error: Unable to process message. ${error.message}`;
+        }
+    }
+
+
+    // Method to create a new thread for a sub-assistant
+    async createNewThread(subAssistantName) {
+        const newThread = await this.createThread({ metadata: { subAssistant: subAssistantName } }); // Create a new thread
+        this.subAssistantThreads[subAssistantName] = newThread.id; // Store the thread ID
+        this.logSystemEvent(`Created new thread for Sub-assistant ${subAssistantName}: ${newThread.id}`); // Log the creation of the new thread
+        return newThread.id; // Return the thread ID
+    }
+
+    // Method to format a message for a sub-assistant
+    formatMessage(message, subAssistant) {
+        return {
             sender: {
                 id: this.assistantId,
                 name: this.assistantName
@@ -111,73 +203,79 @@ class MainAssistantService extends BaseAssistantService {
             },
             content: message
         };
-
-        try {
-            const response = await subAssistant.processMessage(formattedMessage, threadId);
-            return {
-                sender: {
-                    id: subAssistant.assistantId,
-                    name: subAssistant.assistantName
-                },
-                receiver: {
-                    id: this.assistantId,
-                    name: this.assistantName
-                },
-                content: response
-            };
-        } catch (error) {
-            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
-            return {
-                sender: {
-                    id: subAssistant.assistantId,
-                    name: subAssistant.assistantName
-                },
-                receiver: {
-                    id: this.assistantId,
-                    name: this.assistantName
-                },
-                content: `Error: Unable to process message. ${error.message}`
-            };
-        }
     }
 
+    // Method to create a response message
+    createResponseMessage(response, subAssistant) {
+        return {
+            sender: {
+                id: subAssistant.assistantId,
+                name: subAssistant.assistantName
+            },
+            receiver: {
+                id: this.assistantId,
+                name: this.assistantName
+            },
+            content: response
+        };
+    }
+
+    // Method to create an error message
+    createErrorMessage(error, subAssistant) {
+        return {
+            sender: {
+                id: subAssistant.assistantId,
+                name: subAssistant.assistantName
+            },
+            receiver: {
+                id: this.assistantId,
+                name: this.assistantName
+            },
+            content: `Error: Unable to process message. ${error.message}`
+        };
+    }
+
+    // Method to delete all assistants (main and sub-assistants)
     async deleteAllAssistants() {
-        this.addSystemLog('Deleting Main assistant');
-        if (this.assistantId) {
-            try {
-                await this.client.beta.assistants.del(this.assistantId);
-                console.log(`Main assistant ${this.assistantId} deleted`);
-            } catch (error) {
-                console.error(`Error deleting main assistant ${this.assistantId}:`, error);
-            }
-            this.assistantId = null;
-        }
-      
-        console.log('Deleting sub-assistants...');
-        for (const [name, assistant] of Object.entries(this.subAssistants)) {
-            if (assistant.assistantId) {
-                try {
-                    await this.client.beta.assistants.del(assistant.assistantId);
-                    console.log(`Sub-assistant ${name} (${assistant.assistantId}) deleted`);
-                } catch (error) {
-                    console.error(`Error deleting sub-assistant ${name} (${assistant.assistantId}):`, error);
-                }
-                assistant.assistantId = null;
-            }
-        }
-      
-        this.addSystemLog('All assistants deleted');
+        this.logSystemEvent('Deleting Main assistant'); // Log the deletion of the main assistant
+        await this.deleteAssistant(this.assistantId); // Delete the main assistant
+        this.assistantId = null; // Reset the main assistant's ID
+
+        this.logSystemEvent('Deleting sub-assistants...'); // Log the deletion of sub-assistants
+        await Promise.all(Object.entries(this.subAssistants).map(([name, assistant]) => this.deleteAssistant(assistant.assistantId, name))); // Delete all sub-assistants
+        this.logSystemEvent('All assistants deleted'); // Log that all assistants are deleted
     }
 
-    getSystemLogs() {
-        return super.getSystemLogs();
+    // Method to delete a specific assistant
+async deleteAssistant(assistantId, name = '') {
+    if (assistantId) {
+        try {
+            await this.client.beta.assistants.del(assistantId); // Delete the assistant using the API
+            console.log(`Assistant ${name} (${assistantId}) deleted`); // Log the deletion
+        } catch (error) {
+            console.error(`Error deleting assistant ${name} (${assistantId}):`, error); // Log any errors
+        }
     }
+}
 
-    getAndClearSystemLogs() {
-        const logs = this.getSystemLogs();
-        this.clearSystemLogs();
-        return logs;
-    }
+// Method to log system events
+logSystemEvent(message) {
+    console.log(`[System Event] ${message}`);
+    this.addSystemLog(message); // Add a log message to the system logs
+}
+
+// Method to get system logs
+getSystemLogs() {
+    return super.getSystemLogs(); // Call the parent class method to get system logs
+}
+
+// Method to get and clear system logs
+getAndClearSystemLogs() {
+    const logs = this.getSystemLogs();
+    this.clearSystemLogs();
+    return logs;
+}
+
 }
 
 module.exports = MainAssistantService;

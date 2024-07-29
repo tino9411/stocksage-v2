@@ -15,9 +15,9 @@ async function runTests() {
 
     const symbol = 'AAPL'; // Example symbol
 
-    //console.log(`Fetching company profile for ${symbol}...`);
-    //const companyProfile = await fetchCompanyProfile(symbol);
-    //console.log('Company Profile:', companyProfile);
+    console.log(`Fetching company profile for ${symbol}...`);
+    const companyProfile = await fetchCompanyProfile(symbol);
+    console.log('Company Profile:', companyProfile);
 
     //console.log(`Fetching historical data for ${symbol}...`);
     //const historicalData = await fetchHistoricalData(symbol);
@@ -39,9 +39,9 @@ async function runTests() {
     //const cashFlowStatement = await fetchCashFlowStatement(symbol);
     //console.log('Cash Flow Statement:', cashFlowStatement);
 
-    console.log(`Fetching key metrics for ${symbol}...`);
-    const keyMetrics = await fetchKeyMetrics(symbol);
-    console.log('Key Metrics:', keyMetrics);
+    //console.log(`Fetching key metrics for ${symbol}...`);
+    //const keyMetrics = await fetchKeyMetrics(symbol);
+    //console.log('Key Metrics:', keyMetrics);
 
     //console.log(`Calculating technical indicators for ${symbol}...`);
     //const technicalIndicators = await calculateTechnicalIndicators(symbol);
