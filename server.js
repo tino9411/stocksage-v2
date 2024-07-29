@@ -12,12 +12,18 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(cors({
-    origin: '*', // Be more specific in production
-    methods: ['GET', 'POST', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  }));
+  origin: '*', // Be more specific in production
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+
 app.use(express.json());
+
+app.use((req, res, next) => {
+  console.log('Headers before route handling:', res.getHeaders());
+  next();
+});
 
 // Connect to MongoDB
 connectDB();
@@ -39,17 +45,18 @@ app.post('/api/executeService', async (req, res) => {
     const result = await executeService(serviceName, ...params);
     res.json(result);
   } catch (error) {
+    console.error('Error executing service:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
-// Serve static files from the React app
+/* // Serve static files from the React app
 app.use(express.static(path.join(__dirname, 'client/build')));
 
 // The "catchall" handler: for any request that doesn't match one above, send back React's index.html file.
 app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'client/build', 'index.html'));
-});
+}); */
 
 const server = app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
