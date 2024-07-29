@@ -73,56 +73,23 @@ class MainAssistantService extends BaseAssistantService {
         
         this.addSystemLog('All sub-assistants initialized');
     }
-    async handleRequiresAction(thread_id, run) {
-        this.addSystemLog('Handling required action');
-        if (
-            run.required_action &&
-            run.required_action.submit_tool_outputs &&
-            run.required_action.submit_tool_outputs.tool_calls
-        ) {
-            const toolOutputs = await Promise.all(run.required_action.submit_tool_outputs.tool_calls.map(async (tool) => {
-                const { id, function: { name, arguments: args } } = tool;
-                const parsedArgs = JSON.parse(args);
-                try {
-                    let result;
-                    if (name === 'messageSubAssistant') {
-                        result = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
-                    } else {
-                        throw new Error(`Unknown function ${name}`);
-                    }
-                    return {
-                        tool_call_id: id,
-                        output: JSON.stringify(result),
-                    };
-                } catch (error) {
-                    console.error(`Error executing tool ${name}:`, error);
-                    return {
-                        tool_call_id: id,
-                        output: JSON.stringify({ error: error.message }),
-                    };
-                }
-            }));
 
-            try {
-                run = await this.client.beta.threads.runs.submitToolOutputs(
-                    thread_id,
-                    run.id,
-                    { tool_outputs: toolOutputs },
-                );
-                console.log("Tool outputs submitted successfully.");
-            } catch (error) {
-                console.error("Error submitting tool outputs:", error);
-                throw error;
-            }
+    async executeToolCall(toolCall) {
+        const { function: { name, arguments: args } } = toolCall;
+        const parsedArgs = JSON.parse(args);
+
+        switch (name) {
+            case 'messageSubAssistant':
+                return await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
+            default:
+                throw new Error(`Unknown function ${name}`);
         }
-        return run;
     }
 
-    async messageSubAssistant(subAssistantName, message, stream = false) {
+    async messageSubAssistant(subAssistantName, message) {
         this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
         const subAssistant = this.subAssistants[subAssistantName];
         if (!subAssistant) {
-            console.error(`Sub-assistant ${subAssistantName} not found`);
             throw new Error(`Sub-assistant ${subAssistantName} not found`);
         }
 
@@ -145,12 +112,9 @@ class MainAssistantService extends BaseAssistantService {
             content: message
         };
 
-        this.addSystemLog(`Inter-assistant message: ${JSON.stringify(formattedMessage)}`);
-
         try {
-            const response = await subAssistant.processMessage(formattedMessage, threadId, stream);
-
-            const formattedResponse = {
+            const response = await subAssistant.processMessage(formattedMessage, threadId);
+            return {
                 sender: {
                     id: subAssistant.assistantId,
                     name: subAssistant.assistantName
@@ -161,10 +125,6 @@ class MainAssistantService extends BaseAssistantService {
                 },
                 content: response
             };
-
-            console.log(`Sub-assistant response: ${JSON.stringify(formattedResponse)}`);
-
-            return formattedResponse;
         } catch (error) {
             console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
             return {
@@ -181,59 +141,38 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 
-    async processMessage(message, threadId, stream = false) {
-        this.addSystemLog(`Processing message in MainAssistant: ${message.content}`);
-        try {
-            await this.createMessage(threadId, {
-                role: 'user',
-                content: message.content,
-            });
-
-            if (stream) {
-                return this.streamRun(threadId);
-            } else {
-                return this.createRun(threadId);
-            }
-        } catch (error) {
-            console.error('Error processing message in MainAssistant:', error);
-            return `I apologize, but I encountered an error while processing your request. ${error.message}`;
-        }
-    }
-
     async deleteAllAssistants() {
         this.addSystemLog('Deleting Main assistant');
         if (this.assistantId) {
-          try {
-            await this.client.beta.assistants.del(this.assistantId);
-            console.log(`Main assistant ${this.assistantId} deleted`);
-          } catch (error) {
-            console.error(`Error deleting main assistant ${this.assistantId}:`, error);
-          }
-          this.assistantId = null;
+            try {
+                await this.client.beta.assistants.del(this.assistantId);
+                console.log(`Main assistant ${this.assistantId} deleted`);
+            } catch (error) {
+                console.error(`Error deleting main assistant ${this.assistantId}:`, error);
+            }
+            this.assistantId = null;
         }
       
         console.log('Deleting sub-assistants...');
         for (const [name, assistant] of Object.entries(this.subAssistants)) {
-          if (assistant.assistantId) {
-            try {
-              await this.client.beta.assistants.del(assistant.assistantId);
-              console.log(`Sub-assistant ${name} (${assistant.assistantId}) deleted`);
-            } catch (error) {
-              console.error(`Error deleting sub-assistant ${name} (${assistant.assistantId}):`, error);
+            if (assistant.assistantId) {
+                try {
+                    await this.client.beta.assistants.del(assistant.assistantId);
+                    console.log(`Sub-assistant ${name} (${assistant.assistantId}) deleted`);
+                } catch (error) {
+                    console.error(`Error deleting sub-assistant ${name} (${assistant.assistantId}):`, error);
+                }
+                assistant.assistantId = null;
             }
-            assistant.assistantId = null;
-          }
         }
       
         this.addSystemLog('All assistants deleted');
-      }
+    }
 
-      // Ensure getSystemLogs is explicitly defined in MainAssistantService
     getSystemLogs() {
         return super.getSystemLogs();
     }
 
-    // Add a method to clear logs after retrieving them
     getAndClearSystemLogs() {
         const logs = this.getSystemLogs();
         this.clearSystemLogs();

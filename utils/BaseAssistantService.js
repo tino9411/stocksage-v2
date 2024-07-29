@@ -284,7 +284,7 @@ class BaseAssistantService extends EventEmitter {
         }
       }
 
-      async handleRunStatusStream(thread_id, run_id) {
+    async handleRunStatusStream(thread_id, run_id) {
         console.log(`\x1b[34m[Handling stream]\x1b[Assistant ID]: ${this.assistantId}, Thread: ${thread_id}`);
         try {
             const stream = await this.client.beta.threads.runs.stream({
@@ -342,7 +342,6 @@ class BaseAssistantService extends EventEmitter {
           throw error;
         }
       }
-    
 
     async handleRequiresAction(thread_id, run) {
         // This method should be implemented by subclasses
