@@ -24,7 +24,8 @@
     "openai": "^4.53.0",
     "react-json-pretty": "^2.2.0",
     "react-syntax-highlighter": "^15.5.0",
-    "technicalindicators": "^3.1.0"
+    "technicalindicators": "^3.1.0",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
