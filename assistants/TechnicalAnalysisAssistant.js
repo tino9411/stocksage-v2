@@ -1,7 +1,7 @@
 // utils/TechnicalAnalysisAssistant.js
 const BaseAssistantService = require('./BaseAssistantService');
-const { calculateTechnicalIndicators } = require('../services/calculateTechnicalIndicators');
-const { fetchRealTimeQuote } = require('../services/fetchRealTimeQuote');
+const { calculateTechnicalIndicators } = require('../tools/calculateTechnicalIndicators');
+const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
 
 
 class TechnicalAnalysisAssistant extends BaseAssistantService {

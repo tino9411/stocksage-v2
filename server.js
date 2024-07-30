@@ -7,7 +7,8 @@ const chatRouter = require('./routes/chat');
 require('dotenv').config();
 const connectDB = require('./config/db');
 const executeService = require('./utils/serviceExecutor');
-const Chat = require('./services/chat');
+const Chat = require('./services/Chat');
+const commandRoutes = require('./routes/command');
 
 const app = express();
 const port = process.env.PORT || 3000;
@@ -41,6 +42,8 @@ app.use('/api/stocks', stockRoutes);
 
 // Use the chat routes
 app.use('/api/chat', chatRouter);
+
+app.use('/api/command', commandRoutes);
 
 // Route for dynamic service execution
 app.post('/api/executeService', async (req, res) => {

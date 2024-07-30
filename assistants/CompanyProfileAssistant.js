@@ -1,7 +1,7 @@
 // utils/CompanyProfileAssistant.js
 const BaseAssistantService = require('./BaseAssistantService');
-const { fetchCompanyProfile } = require('../services/fetchCompanyProfile');
-const { fetchRealTimeQuote } = require('../services/fetchRealTimeQuote');
+const { fetchCompanyProfile } = require('../tools/fetchCompanyProfile');
+const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
 
 class CompanyProfileAssistant extends BaseAssistantService {
     constructor(apiKey) {

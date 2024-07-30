@@ -1,11 +1,11 @@
-const { fetchCompanyProfile } = require('./services/fetchCompanyProfile');
-const { fetchHistoricalData } = require('./services/fetchHistoricalData');
-const { fetchRealTimeQuote } = require('./services/fetchRealTimeQuote');
-const { fetchIncomeStatement } = require('./services/fetchIncomeStatement');
-const { fetchBalanceSheet } = require('./services/fetchBalanceSheet');
-const { fetchCashFlowStatement } = require('./services/fetchCashFlowStatement');
-const { fetchKeyMetrics } = require('./services/fetchKeyMetrics');
-const { calculateTechnicalIndicators } = require('./services/calculateTechnicalIndicators');
+const { fetchCompanyProfile } = require('./tools/fetchCompanyProfile');
+const { fetchHistoricalData } = require('./tools/fetchHistoricalData');
+const { fetchRealTimeQuote } = require('./tools/fetchRealTimeQuote');
+const { fetchIncomeStatement } = require('./tools/fetchIncomeStatement');
+const { fetchBalanceSheet } = require('./tools/fetchBalanceSheet');
+const { fetchCashFlowStatement } = require('./tools/fetchCashFlowStatement');
+const { fetchKeyMetrics } = require('./tools/fetchKeyMetrics');
+const { calculateTechnicalIndicators } = require('./tools/calculateTechnicalIndicators');
 const connectDB = require('./config/db'); // Import the database connection function
 const Stock = require('./models/Stock');
 require('dotenv').config();

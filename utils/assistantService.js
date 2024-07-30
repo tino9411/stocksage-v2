@@ -1,12 +1,12 @@
 const OpenAI = require('openai');
-const { fetchCompanyProfile } = require('../services/fetchCompanyProfile');
-const { fetchRealTimeQuote } = require('../services/fetchRealTimeQuote');
-const { fetchHistoricalData } = require('../services/fetchHistoricalData');
-const { fetchKeyMetrics } = require('../services/fetchKeyMetrics');
-const { fetchIncomeStatement } = require('../services/fetchIncomeStatement');
-const { fetchCashFlowStatement } = require('../services/fetchCashFlowStatement');
-const { fetchBalanceSheet } = require('../services/fetchBalanceSheet');
-const { calculateTechnicalIndicators } = require('../services/calculateTechnicalIndicators');
+const { fetchCompanyProfile } = require('../tools/fetchCompanyProfile');
+const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
+const { fetchHistoricalData } = require('../tools/fetchHistoricalData');
+const { fetchKeyMetrics } = require('../tools/fetchKeyMetrics');
+const { fetchIncomeStatement } = require('../tools/fetchIncomeStatement');
+const { fetchCashFlowStatement } = require('../tools/fetchCashFlowStatement');
+const { fetchBalanceSheet } = require('../tools/fetchBalanceSheet');
+const { calculateTechnicalIndicators } = require('../tools/calculateTechnicalIndicators');
 const connectDB = require('../config/db');
 
 class AssistantService {

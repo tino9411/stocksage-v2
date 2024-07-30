@@ -5,7 +5,7 @@ const {
     fetchEconomicIndicators, 
     fetchEconomicCalendar, 
     fetchMarketRiskPremium 
-} = require('../services/EconomicDataTools');
+} = require('../tools/fetchEconomicDataTools');
 
 class EconomicDataAssistant extends BaseAssistantService {
     constructor(apiKey) {

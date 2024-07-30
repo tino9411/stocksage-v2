@@ -4,7 +4,7 @@ const {
     fetchHistoricalSocialSentiment,
     fetchTrendingSocialSentiment,
     fetchSocialSentimentChanges
-} = require('../services/SentimentAnalysisTools');
+} = require('../tools/fetchSentimentTools');
 
 class SentimentAnalysisAssistant extends BaseAssistantService {
     constructor(apiKey) {

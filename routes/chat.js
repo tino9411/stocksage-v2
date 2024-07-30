@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Chat = require('../services/chat');
+const Chat = require('../services/Chat');
 require('dotenv').config();
 const chat = new Chat(process.env.OPENAI_API_KEY);
 
