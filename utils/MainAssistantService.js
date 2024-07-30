@@ -4,21 +4,18 @@ const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
 const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 const EconomicDataAssistant = require('./EconomicDataAssistant');
+const SentimentAnalysisAssistant = require('./SentimentAnalysisAssistant');
 
-
-// Define the MainAssistantService class, extending the BaseAssistantService
 class MainAssistantService extends BaseAssistantService {
-    // Constructor to initialize the MainAssistantService instance
     constructor(apiKey) {
-        super(apiKey); // Call the parent class constructor
-        this.assistantId = null; // Store the main assistant's ID
-        this.assistantName = 'MainAssistant'; // Name of the main assistant
-        this.subAssistants = {}; // Object to store sub-assistants
-        this.subAssistantThreads = {}; // Object to store threads for sub-assistants
-        this.instructions = this.getInstructions(); // Instructions for the main assistant
+        super(apiKey);
+        this.assistantId = null;
+        this.assistantName = 'MainAssistant';
+        this.subAssistants = {};
+        this.subAssistantThreads = {};
+        this.instructions = this.getInstructions();
     }
 
-    // Method to get instructions for the main assistant
     getInstructions() {
         return `You are the main stock and financial analyst. Your role is to analyze stock data and provide insightful reports.
         You have access to various financial data and metrics for stocks. When asked about a specific stock,
@@ -29,13 +26,15 @@ class MainAssistantService extends BaseAssistantService {
         3. Technical indicators (moving averages, RSI, MACD)
         4. Financial ratios and metrics
         5. Potential risks and opportunities
-        6. Economic data analysis and how it will affect the given stock.
-        6. A summary and recommendation (buy, sell or hold). Include a recommended entry price.
+        6. Economic data analysis and how it will affect the given stock
+        7. Sentiment analysis based on social media and other sources
+        8. A summary and recommendation (buy, sell or hold). Include a recommended entry price.
         
         When you need specific information, use the messageSubAssistant function to request it from the appropriate sub-assistant.
         Always provide clear explanations and justify your analysis.
         Be conversational and engaging in your responses. Remember the context of the ongoing conversation.`;
     }
+
 
     // Method to initialize the main assistant and its sub-assistants
     async initialize({ model, name }) {
@@ -93,7 +92,7 @@ class MainAssistantService extends BaseAssistantService {
                         subAssistantName: {
                             type: "string",
                             description: "The name of the sub-assistant to message",
-                            enum: ["CompanyProfile", "FinancialAnalysis", "TechnicalAnalysis", "EconomicData"]
+                            enum: ["CompanyProfile", "FinancialAnalysis", "TechnicalAnalysis", "EconomicData", "SentimentAnalysis"]
                         },
                         message: {
                             type: "string",
@@ -112,7 +111,8 @@ class MainAssistantService extends BaseAssistantService {
             { name: 'CompanyProfile', AssistantClass: CompanyProfileAssistant },
             { name: 'FinancialAnalysis', AssistantClass: FinancialAnalysisAssistant },
             { name: 'TechnicalAnalysis', AssistantClass: TechnicalAnalysisAssistant },
-            { name: 'EconomicData', AssistantClass: EconomicDataAssistant }
+            { name: 'EconomicData', AssistantClass: EconomicDataAssistant },
+            { name: 'SentimentAnalysis', AssistantClass: SentimentAnalysisAssistant }
         ];
 
         for (const config of subAssistantConfigs) {
@@ -208,6 +208,11 @@ class MainAssistantService extends BaseAssistantService {
             response.toLowerCase().includes('treasury rates') ||
             response.toLowerCase().includes('market risk premium')) {
             subAssistants.push('EconomicData');
+        }
+        if (response.toLowerCase().includes('sentiment') || 
+            response.toLowerCase().includes('social media') ||
+            response.toLowerCase().includes('public opinion')) {
+            subAssistants.push('SentimentAnalysis');
         }
         return subAssistants;
     }
