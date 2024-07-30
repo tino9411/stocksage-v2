@@ -76,6 +76,14 @@ class Chat extends EventEmitter {
           onEvent({ type: 'textDelta', data: delta });
       });
 
+      stream.on('toolCallCreated', (toolCall) => {
+          onEvent({ type: 'toolCallCreated', data: toolCall });
+      });
+
+      stream.on('toolCallDelta', (toolCallDelta, snapshot) => {
+          onEvent({ type: 'toolCallDelta', data: { delta: toolCallDelta, snapshot } });
+      });
+
       stream.on('end', async () => {
           const currentRun = stream.currentRun();
           if (currentRun && currentRun.status === "requires_action" &&
@@ -92,7 +100,6 @@ class Chat extends EventEmitter {
 
       return stream.finalMessages();
   }
-
 
     // Stream messages in real-time
     async streamMessage(userMessage, onEvent) {
@@ -203,14 +210,36 @@ class Chat extends EventEmitter {
     // Handle tool calls required during a run
     async handleToolCalls(threadId, toolCalls, runId, onEvent) {
       try {
-          console.log('[handleToolCalls] Processing tool calls');
+          console.log('[handleToolCalls] Processing tool calls:', toolCalls);
           if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
               console.warn('No tool calls to handle');
               return;
           }
 
           const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
+              console.log('[handleToolCalls] Processing tool call:', toolCall);
+              onEvent({ 
+                  type: 'toolCallCreated', 
+                  data: {
+                      id: toolCall.id,
+                      function: {
+                          name: toolCall.function.name,
+                          arguments: toolCall.function.arguments
+                      }
+                  }
+              });
               const result = await this.mainAssistant.executeToolCall(toolCall);
+              onEvent({ 
+                  type: 'toolCallCompleted', 
+                  data: {
+                      id: toolCall.id,
+                      function: {
+                          name: toolCall.function.name,
+                          arguments: toolCall.function.arguments
+                      },
+                      output: result
+                  }
+              });
               return {
                   tool_call_id: toolCall.id,
                   output: JSON.stringify(result),

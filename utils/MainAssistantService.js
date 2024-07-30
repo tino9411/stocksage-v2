@@ -36,22 +36,45 @@ class MainAssistantService extends BaseAssistantService {
 
     // Method to initialize the main assistant and its sub-assistants
     async initialize({ model, name }) {
-        this.logSystemEvent('Initializing Main Assistant'); // Log the initialization process
-        await this.initializeMainAssistant(model, name); // Initialize the main assistant
-        await this.initializeSubAssistants(model); // Initialize the sub-assistants
+        this.logSystemEvent('Initializing Main Assistant');
+        await this.deleteExistingAssistants();
+        await this.initializeMainAssistant(model, name);
+        await this.initializeSubAssistants(model);
     }
 
-    // Method to initialize the main assistant
+    async deleteExistingAssistants() {
+        this.logSystemEvent('Checking for existing assistants');
+        try {
+            const existingAssistants = await this.listAssistants();
+            if (existingAssistants.length > 0) {
+                this.logSystemEvent('Existing assistants found, deleting them');
+                for (const assistant of existingAssistants) {
+                    try {
+                        await this.deleteAssistant(assistant.id);
+                        this.logSystemEvent(`Deleted assistant: ${assistant.id}`);
+                    } catch (error) {
+                        this.logSystemEvent(`Failed to delete assistant ${assistant.id}: ${error.message}`);
+                    }
+                }
+                this.logSystemEvent('Finished deleting existing assistants');
+            } else {
+                this.logSystemEvent('No existing assistants found, continuing');
+            }
+        } catch (error) {
+            this.logSystemEvent(`Error listing assistants: ${error.message}`);
+        }
+    }
+
     async initializeMainAssistant(model, name) {
-        const messageSubAssistantTool = this.getMessageSubAssistantTool(); // Get the tool for messaging sub-assistants
+        const messageSubAssistantTool = this.getMessageSubAssistantTool();
         const newAssistant = await this.createAssistant({
             model,
             name,
             instructions: this.instructions,
             tools: [messageSubAssistantTool]
         });
-        this.assistantId = newAssistant.id; // Store the main assistant's ID
-        this.logSystemEvent('Main Assistant initialized'); // Log that the main assistant is initialized
+        this.assistantId = newAssistant.id;
+        this.logSystemEvent('Main Assistant initialized');
     }
 
     // Method to get the tool for messaging sub-assistants

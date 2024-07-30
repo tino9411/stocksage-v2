@@ -67,7 +67,7 @@ class BaseAssistantService extends EventEmitter {
         }
     }
 
-    async listAssistants({ limit = 20, order = 'desc', after = null, before = null }) {
+    async listAssistants({ limit = 100, order = 'desc', after = null, before = null } = {}) {
         try {
             const assistants = await this.client.beta.assistants.list({
                 limit,
@@ -112,15 +112,16 @@ class BaseAssistantService extends EventEmitter {
         }
     }
 
-    async deleteAssistant(assistant_id) {
+    async deleteAssistant(assistantId) {
         try {
-            const response = await this.client.beta.assistants.del(assistant_id);
+            const response = await this.client.beta.assistants.del(assistantId);
             return response;
         } catch (error) {
             console.error('Error deleting assistant:', error);
             throw error;
         }
     }
+
 
     async createThread({ messages = [], tool_resources = null, metadata = {} }) {
         try {
