@@ -69,64 +69,60 @@ class Chat extends EventEmitter {
     }
 
     // Recursive method to observe stream
-    async observeStream(stream) {
-        this.currentStream = stream;
+    async observeStream(stream, onEvent) {
+      this.currentStream = stream;
 
-        stream.on('textDelta', (delta) => {
-            this.emit('textDelta', delta);
-        });
+      stream.on('textDelta', (delta) => {
+          onEvent({ type: 'textDelta', data: delta });
+      });
 
-        stream.on('end', async () => {
-            const currentRun = stream.currentRun();
-            if (currentRun.status === "requires_action" &&
-                currentRun.required_action.type === "submit_tool_outputs") {
-                const toolCalls = currentRun.required_action.submit_tool_outputs.tool_calls;
-                await this.handleToolCalls(this.threadId, toolCalls, currentRun.id);
-            }
-            this.emit('end');
-        });
+      stream.on('end', async () => {
+          const currentRun = stream.currentRun();
+          if (currentRun && currentRun.status === "requires_action" &&
+              currentRun.required_action.type === "submit_tool_outputs") {
+              const toolCalls = currentRun.required_action.submit_tool_outputs.tool_calls;
+              await this.handleToolCalls(this.threadId, toolCalls, currentRun.id, onEvent);
+          }
+          onEvent({ type: 'end' });
+      });
 
-        stream.on('error', (err) => {
-            this.emit('error', err);
-        });
+      stream.on('error', (err) => {
+          onEvent({ type: 'error', data: err.message });
+      });
 
-        return stream.finalMessages();
-    }
+      return stream.finalMessages();
+  }
+
 
     // Stream messages in real-time
     async streamMessage(userMessage, onEvent) {
-        console.log('[streamMessage] Starting with message:', userMessage);
-        this.ensureConversationStarted();
+      console.log('[streamMessage] Starting with message:', userMessage);
+      this.ensureConversationStarted();
 
-        try {
-            console.log('[streamMessage] Creating message in thread');
-            await this.mainAssistant.createMessage(this.threadId, {
-                role: 'user',
-                content: userMessage,
-            });
+      try {
+          console.log('[streamMessage] Creating message in thread');
+          await this.mainAssistant.createMessage(this.threadId, {
+              role: 'user',
+              content: userMessage,
+          });
 
-            const { assistantId, threadId } = this.getStreamParameters();
-            const stream = await this.mainAssistant.client.beta.threads.runs.createAndStream(
-                threadId,
-                { assistant_id: assistantId }
-            );
+          const { assistantId, threadId } = this.getStreamParameters();
+          const stream = await this.mainAssistant.client.beta.threads.runs.createAndStream(
+              threadId,
+              { assistant_id: assistantId }
+          );
 
-            this.observeStream(stream);
+          await this.observeStream(stream, onEvent);
 
-            // Set up event listeners
-            this.on('textDelta', (delta) => onEvent({ type: 'textDelta', data: delta }));
-            this.on('requiresAction', (data) => this.handleToolCalls(threadId, data.toolCalls, data.runId, onEvent));
-            this.on('end', () => onEvent({ type: 'end' }));
+          const finalMessages = await stream.finalMessages();
+          console.log('[streamMessage] Final messages:', finalMessages);
 
-            const finalMessages = await stream.finalMessages();
-            console.log('[streamMessage] Final messages:', finalMessages);
-
-        } catch (error) {
-            console.error('[streamMessage] Error:', error);
-            onEvent({ type: 'error', data: error.message });
-            throw error;
-        }
-    }
+      } catch (error) {
+          console.error('[streamMessage] Error:', error);
+          onEvent({ type: 'error', data: error.message });
+          throw error;
+      }
+  }
 
     // Get parameters for the stream
     getStreamParameters() {
@@ -206,36 +202,35 @@ class Chat extends EventEmitter {
 
     // Handle tool calls required during a run
     async handleToolCalls(threadId, toolCalls, runId, onEvent) {
-        try {
-            console.log('[handleToolCalls] Processing tool calls');
-            if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
-                console.warn('No tool calls to handle');
-                return;
-            }
+      try {
+          console.log('[handleToolCalls] Processing tool calls');
+          if (!Array.isArray(toolCalls) || toolCalls.length === 0) {
+              console.warn('No tool calls to handle');
+              return;
+          }
 
-            const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
-                const result = await this.mainAssistant.executeToolCall(toolCall);
-                return {
-                    tool_call_id: toolCall.id,
-                    output: JSON.stringify(result),
-                };
-            }));
+          const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
+              const result = await this.mainAssistant.executeToolCall(toolCall);
+              return {
+                  tool_call_id: toolCall.id,
+                  output: JSON.stringify(result),
+              };
+          }));
 
-            console.log('[handleToolCalls] Submitting tool outputs and starting stream');
-            const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(
-                threadId,
-                runId,
-                { tool_outputs: toolOutputs }
-            );
+          console.log('[handleToolCalls] Submitting tool outputs and starting stream');
+          const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(
+              threadId,
+              runId,
+              { tool_outputs: toolOutputs }
+          );
 
-            // Recursively observe the new stream
-            this.observeStream(stream);
+          await this.observeStream(stream, onEvent);
 
-        } catch (error) {
-            console.error('[handleToolCalls] Error handling tool calls:', error);
-            onEvent({ type: 'error', data: error.message });
-        }
-    }
+      } catch (error) {
+          console.error('[handleToolCalls] Error handling tool calls:', error);
+          onEvent({ type: 'error', data: error.message });
+      }
+  }
 
     async waitForRunCompletion(threadId, runId) {
       let run;
