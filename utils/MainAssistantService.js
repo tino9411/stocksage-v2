@@ -3,6 +3,8 @@ const BaseAssistantService = require('./BaseAssistantService');
 const CompanyProfileAssistant = require('./CompanyProfileAssistant');
 const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
 const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
+const EconomicDataAssistant = require('./EconomicDataAssistant');
+
 
 // Define the MainAssistantService class, extending the BaseAssistantService
 class MainAssistantService extends BaseAssistantService {
@@ -27,6 +29,7 @@ class MainAssistantService extends BaseAssistantService {
         3. Technical indicators (moving averages, RSI, MACD)
         4. Financial ratios and metrics
         5. Potential risks and opportunities
+        6. Economic data analysis and how it will affect the given stock.
         6. A summary and recommendation (buy, sell or hold). Include a recommended entry price.
         
         When you need specific information, use the messageSubAssistant function to request it from the appropriate sub-assistant.
@@ -83,14 +86,14 @@ class MainAssistantService extends BaseAssistantService {
             type: "function",
             function: {
                 name: "messageSubAssistant",
-                description: "Send a message to a specific sub-assistant",
+                description: "Send a message to a specific sub-assistant.",
                 parameters: {
                     type: "object",
                     properties: {
                         subAssistantName: {
                             type: "string",
                             description: "The name of the sub-assistant to message",
-                            enum: ["CompanyProfile", "FinancialAnalysis", "TechnicalAnalysis"]
+                            enum: ["CompanyProfile", "FinancialAnalysis", "TechnicalAnalysis", "EconomicData"]
                         },
                         message: {
                             type: "string",
@@ -103,21 +106,48 @@ class MainAssistantService extends BaseAssistantService {
         };
     }
 
-    // Method to initialize all sub-assistants
     async initializeSubAssistants(model) {
-        this.logSystemEvent('Initializing Sub-assistants'); // Log the initialization of sub-assistants
-        await this.initializeSubAssistant('CompanyProfile', CompanyProfileAssistant, model);
-        await this.initializeSubAssistant('FinancialAnalysis', FinancialAnalysisAssistant, model);
-        await this.initializeSubAssistant('TechnicalAnalysis', TechnicalAnalysisAssistant, model);
-        this.logSystemEvent('All sub-assistants initialized'); // Log that all sub-assistants are initialized
+        this.logSystemEvent('Initializing Sub-assistants');
+        const subAssistantConfigs = [
+            { name: 'CompanyProfile', AssistantClass: CompanyProfileAssistant },
+            { name: 'FinancialAnalysis', AssistantClass: FinancialAnalysisAssistant },
+            { name: 'TechnicalAnalysis', AssistantClass: TechnicalAnalysisAssistant },
+            { name: 'EconomicData', AssistantClass: EconomicDataAssistant }
+        ];
+
+        for (const config of subAssistantConfigs) {
+            await this.initializeSubAssistant(config.name, config.AssistantClass, model);
+        }
+
+        this.logSystemEvent('All sub-assistants initialized');
     }
 
-    // Method to initialize a specific sub-assistant
     async initializeSubAssistant(name, AssistantClass, model) {
-        const assistant = new AssistantClass(this.apiKey); // Create an instance of the sub-assistant
-        await assistant.initialize({ model, name }); // Initialize the sub-assistant
-        this.subAssistants[name] = assistant; // Store the sub-assistant in the subAssistants object
-        this.logSystemEvent(`Sub-assistant ${name} initialized`); // Log that the sub-assistant is initialized
+        this.logSystemEvent(`Initializing ${name} Assistant`);
+        try {
+            let assistant;
+            if (typeof AssistantClass === 'function') {
+                // If AssistantClass is a constructor
+                assistant = new AssistantClass(this.apiKey);
+            } else if (typeof AssistantClass === 'object' && AssistantClass !== null) {
+                // If AssistantClass is an object (e.g., exported as a singleton)
+                assistant = AssistantClass;
+            } else {
+                throw new Error(`Invalid AssistantClass type for ${name}`);
+            }
+
+            if (typeof assistant.initialize === 'function') {
+                await assistant.initialize({ model, name });
+            } else {
+                this.logSystemEvent(`Warning: ${name} Assistant does not have an initialize method`);
+            }
+
+            this.subAssistants[name] = assistant;
+            this.logSystemEvent(`Sub-assistant ${name} initialized`);
+        } catch (error) {
+            this.logSystemEvent(`Error initializing ${name} Assistant: ${error.message}`);
+            throw error;
+        }
     }
 
     async chatWithAssistant(thread_id, assistant_id, userMessage, stream = false) {
@@ -173,6 +203,12 @@ class MainAssistantService extends BaseAssistantService {
         if (response.toLowerCase().includes('company profile')) subAssistants.push('CompanyProfile');
         if (response.toLowerCase().includes('financial analysis')) subAssistants.push('FinancialAnalysis');
         if (response.toLowerCase().includes('technical analysis')) subAssistants.push('TechnicalAnalysis');
+        if (response.toLowerCase().includes('economic data') || 
+            response.toLowerCase().includes('economic indicators') || 
+            response.toLowerCase().includes('treasury rates') ||
+            response.toLowerCase().includes('market risk premium')) {
+            subAssistants.push('EconomicData');
+        }
         return subAssistants;
     }
 
