@@ -8,8 +8,11 @@ const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
 
 class StockService {
   constructor() {
-    this.wss = null;
-    this.watchlist = new Set();
+    this.ws = null;
+    this.subscriptions = new Map();
+    this.apiKey = process.env.FINANCIAL_MODELING_PREP_API_KEY;
+    this.reconnectAttempts = 0;
+    this.maxReconnectAttempts = 5;
   }
 
   initializeWebSocket() {
@@ -17,34 +20,84 @@ class StockService {
 
     this.ws.on('open', () => {
       console.log('WebSocket connection established');
-      const loginMessage = JSON.stringify({
-        event: 'login',
-        data: { apiKey: process.env.FMP_API_KEY }
-      });
-      this.ws.send(loginMessage);
-
-      // Subscribe to all stocks in the watchlist
-      if (this.watchlist.size > 0) {
-        this.subscribeToRealTimeQuotes(Array.from(this.watchlist));
-      }
+      this.login();
+      this.reconnectAttempts = 0;
     });
 
     this.ws.on('message', (data) => {
-      const quote = JSON.parse(data);
-      if (quote.type === 'T' || quote.type === 'Q') {
-        this.updateStockPrice(quote);
-      }
+      const message = JSON.parse(data);
+      this.handleMessage(message);
+    });
+
+    this.ws.on('close', () => {
+      console.log('WebSocket connection closed');
+      this.attemptReconnect();
     });
 
     this.ws.on('error', (error) => {
       console.error('WebSocket error:', error);
     });
+  }
 
-    this.ws.on('close', () => {
-      console.log('WebSocket connection closed');
-      // Attempt to reconnect after a delay
+  login() {
+    const loginMessage = {
+      event: 'login',
+      data: { apiKey: this.apiKey }
+    };
+    this.ws.send(JSON.stringify(loginMessage));
+  }
+
+  attemptReconnect() {
+    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+      this.reconnectAttempts++;
+      console.log(`Attempting to reconnect (${this.reconnectAttempts}/${this.maxReconnectAttempts})...`);
       setTimeout(() => this.initializeWebSocket(), 5000);
+    } else {
+      console.error('Max reconnection attempts reached. Please check your connection and restart the application.');
+    }
+  }
+
+  handleMessage(message) {
+    const { s: symbol, ...data } = message;
+    if (this.subscriptions.has(symbol)) {
+      this.subscriptions.get(symbol).forEach(callback => callback(data));
+    }
+  }
+
+  subscribe(symbols, callback) {
+    symbols.forEach(symbol => {
+      if (!this.subscriptions.has(symbol)) {
+        this.subscriptions.set(symbol, new Set());
+      }
+      this.subscriptions.get(symbol).add(callback);
     });
+
+    const subscribeMessage = {
+      event: 'subscribe',
+      data: { ticker: symbols }
+    };
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(subscribeMessage));
+    }
+  }
+
+  unsubscribe(symbols, callback) {
+    symbols.forEach(symbol => {
+      if (this.subscriptions.has(symbol)) {
+        this.subscriptions.get(symbol).delete(callback);
+        if (this.subscriptions.get(symbol).size === 0) {
+          this.subscriptions.delete(symbol);
+        }
+      }
+    });
+
+    const unsubscribeMessage = {
+      event: 'unsubscribe',
+      data: { ticker: symbols }
+    };
+    if (this.ws.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(unsubscribeMessage));
+    }
   }
 
   broadcastUpdate(data) {
@@ -64,56 +117,6 @@ class StockService {
     } catch (error) {
       console.error('Error searching stocks:', error);
       throw error;
-    }
-  }
-
-  async addToWatchlist(symbol) {
-    try {
-      let stock = await this.fetchCompanyProfile(symbol);
-      if (!stock) {
-        throw new Error('Stock not found');
-      }
-      this.watchlist.add(symbol);
-      this.subscribeToRealTimeQuotes([symbol]);
-      return stock;
-    } catch (error) {
-      console.error('Error adding stock to watchlist:', error);
-      throw error;
-    }
-  }
-
-  async getWatchlist() {
-    try {
-      const watchlistStocks = await Promise.all(
-        Array.from(this.watchlist).map(async (symbol) => {
-          const stock = await Stock.findOne({ symbol });
-          if (stock) {
-            const realTimeQuote = await fetchRealTimeQuote(symbol);
-            return {
-              symbol: stock.symbol,
-              companyName: stock.companyName,
-              ...realTimeQuote
-            };
-          }
-          return null;
-        })
-      );
-      return watchlistStocks.filter(stock => stock !== null);
-    } catch (error) {
-      console.error('Error fetching watchlist:', error);
-      return [];
-    }
-  }
-
-  removeFromWatchlist(symbol) {
-    this.watchlist.delete(symbol);
-    // Unsubscribe from real-time quotes for this symbol if needed
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const unsubscribeMessage = JSON.stringify({
-        event: 'unsubscribe',
-        data: { ticker: symbol }
-      });
-      this.ws.send(unsubscribeMessage);
     }
   }
 
@@ -146,66 +149,6 @@ class StockService {
     } catch (error) {
       console.error(`Error fetching company profile for ${symbol}:`, error);
       throw error;
-    }
-  }
-
-  subscribeToRealTimeQuotes(symbols) {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      console.log('WebSocket not connected. Initializing connection...');
-      this.initializeWebSocket();
-      return;
-    }
-
-    const subscribeMessage = JSON.stringify({
-      event: 'subscribe',
-      data: { ticker: symbols }
-    });
-    this.ws.send(subscribeMessage);
-    console.log(`Subscribed to real-time quotes for: ${symbols.join(', ')}`);
-  }
-
-  async updateStockPrice(quote) {
-    try {
-      if (!quote || !quote.s) {
-        console.error('Invalid quote received:', quote);
-        return;
-      }
-      console.log(`Updating stock price for ${quote.s}`);
-      const price = quote.type === 'T' ? quote.lp : (quote.ap + quote.bp) / 2;
-      const stock = await Stock.findOne({ symbol: quote.s });
-
-      if (stock) {
-        const change = price - stock.previousClose;
-        const changePercent = (change / stock.previousClose) * 100;
-
-        const updatedStock = await Stock.findOneAndUpdate(
-          { symbol: quote.s },
-          {
-            $set: {
-              price: price,
-              change: change,
-              changePercent: changePercent,
-              lastUpdated: new Date()
-            }
-          },
-          { new: true }
-        );
-
-        if (updatedStock) {
-          console.log(`Updated stock price for ${quote.s}`);
-          this.broadcastUpdate({
-            event: 'price',
-            symbol: updatedStock.symbol,
-            price: updatedStock.price,
-            change: updatedStock.change,
-            changePercent: updatedStock.changePercent
-          });
-        }
-      } else {
-        console.log(`No stock found for symbol ${quote.s}`);
-      }
-    } catch (error) {
-      console.error(`Error updating stock price for ${quote.s}:`, error);
     }
   }
 

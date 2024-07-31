@@ -1,6 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const Stock = require('../services/StockService');
+const expressWs = require('express-ws')(router);
+
+// WebSocket route
+router.ws('/realtime', (ws, req) => {
+  console.log('New WebSocket connection established');
+
+  ws.on('message', (msg) => {
+    const { action, symbols } = JSON.parse(msg);
+    
+    if (action === 'subscribe') {
+      symbols.forEach(symbol => {
+        Stock.subscribe([symbol], (data) => {
+          ws.send(JSON.stringify({ symbol, data }));
+        });
+      });
+    } else if (action === 'unsubscribe') {
+      symbols.forEach(symbol => {
+        Stock.unsubscribe([symbol], () => {});
+      });
+    }
+  });
+
+  ws.on('close', () => {
+    console.log('WebSocket connection closed');
+    // Unsubscribe from all symbols when the connection is closed
+    Stock.unsubscribeAll(ws);
+  });
+});
 
 // Search for stocks
 router.get('/search', async (req, res) => {
@@ -11,34 +39,6 @@ router.get('/search', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Error searching stocks', error: error.message });
   }
-});
-
-// Add stock to watchlist
-router.post('/watchlist', async (req, res) => {
-  try {
-    const { symbol } = req.body;
-    const stock = await Stock.addToWatchlist(symbol);
-    res.json(stock);
-  } catch (error) {
-    res.status(500).json({ message: 'Error adding stock to watchlist', error: error.message });
-  }
-});
-
-// Get watchlist
-router.get('/watchlist', async (req, res) => {
-    try {
-      const watchlist = await Stock.getWatchlist();
-      res.json(watchlist);
-    } catch (error) {
-      res.status(500).json({ message: 'Error fetching watchlist', error: error.message });
-    }
-  });
-
-// Remove stock from watchlist
-router.delete('/watchlist/:symbol', (req, res) => {
-  const { symbol } = req.params;
-  Stock.removeFromWatchlist(symbol);
-  res.json({ message: 'Stock removed from watchlist' });
 });
 
 // Get historical data for a stock
@@ -61,6 +61,17 @@ router.get('/:symbol/financials', async (req, res) => {
     res.json(financials);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching financial statements', error: error.message });
+  }
+});
+
+// Get company profile
+router.get('/:symbol/profile', async (req, res) => {
+  try {
+    const { symbol } = req.params;
+    const profile = await Stock.fetchCompanyProfile(symbol);
+    res.json(profile);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching company profile', error: error.message });
   }
 });
 
