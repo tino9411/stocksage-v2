@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const Chat = require('../services/Chat');
+const Chat = require('../services/chat');
 require('dotenv').config();
 const chat = new Chat(process.env.OPENAI_API_KEY);
 
@@ -84,15 +84,6 @@ router.get('/stream', async (req, res) => {
                   break;
               case 'textCreated':
                   sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });
-                  break;
-              case 'toolCallCreated':
-                  sendSSE('toolCallCreated', { toolCall: event.data });
-                  break;
-              case 'toolCallDelta':
-                  sendSSE('toolCallDelta', { 
-                      delta: event.data.delta,
-                      snapshot: event.data.snapshot
-                  });
                   break;
               case 'requiresAction':
                   sendSSE('requiresAction', { toolCalls: event.data });

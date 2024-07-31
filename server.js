@@ -18,9 +18,11 @@ const Stock = require('./services/StockService');
 
 const app = express();
 
-app.use(express.json({ limit: '1mb' }));
-app.use(express.urlencoded({ limit: '1mb', extended: true }));
-const server = http.createServer(app);
+// Create server with increased header size limit
+const server = http.createServer({
+  maxHeaderSize: 32768  // Increase max header size to 32KB
+}, app);
+
 const wss = new WebSocket.Server({ server });
 const port = process.env.PORT || 3000;
 
@@ -33,7 +35,17 @@ app.use(cors({
   }));
 
 app.use(compression());
-app.use(express.json());
+app.use(express.json({ limit: '5mb' }));
+app.use(express.urlencoded({ limit: '5mb', extended: true }));
+
+// Add header logging middleware
+app.use((req, res, next) => {
+  console.log('Request headers:', JSON.stringify(req.headers, null, 2));
+  console.log('Request URL:', req.url);
+  console.log('Request method:', req.method);
+  next();
+});
+
 app.use(session({
   secret: process.env.SESSION_SECRET,
   resave: false,
@@ -45,11 +57,6 @@ app.use(session({
 }));
 app.use(passport.initialize());
 app.use(passport.session());
-
-app.use((req, res, next) => {
-  console.log('Headers before route handling:', res.getHeaders());
-  next();
-});
 
 // Connect to MongoDB
 connectDB().then(() => {
@@ -63,7 +70,6 @@ connectDB().then(() => {
 const chat = new Chat(process.env.OPENAI_API_KEY);
 
 // Routes
-
 app.use('/api/stocks', stockRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRouter);
@@ -74,13 +80,12 @@ app.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
   );
   
-  app.get('/auth/google/callback',
-    passport.authenticate('google', { failureRedirect: '/login' }),
-    (req, res) => {
-      // Successful authentication, redirect to the client-side callback route
-      res.redirect(`${process.env.CLIENT_URL}/auth/callback`);
-    }
-  );
+app.get('/auth/google/callback',
+  passport.authenticate('google', { failureRedirect: '/login' }),
+  (req, res) => {
+    res.redirect(`${process.env.CLIENT_URL}/auth/callback`);
+  }
+);
 
 // Route to check authentication status
 app.get('/api/auth/status', (req, res) => {
