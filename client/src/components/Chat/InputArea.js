@@ -70,6 +70,7 @@ function InputAreaComponent() {
   const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
+  const commandListRef = useRef(null);
 
   useEffect(() => {
     if (input.startsWith('/')) {
@@ -83,6 +84,15 @@ function InputAreaComponent() {
       setShowCommands(false);
     }
   }, [input]);
+
+  useEffect(() => {
+    if (commandListRef.current) {
+      const selectedElement = commandListRef.current.children[selectedIndex];
+      if (selectedElement) {
+        selectedElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }
+  }, [selectedIndex]);
 
   const handleSendMessage = async () => {
     if (input.trim() && !isStreaming) {
@@ -174,7 +184,7 @@ function InputAreaComponent() {
               },
             ]}
           >
-            <Paper elevation={0}>
+            <Paper elevation={0} ref={commandListRef}>
               {filteredCommands.map((cmd, index) => (
                 <CommandItem
                   key={index}

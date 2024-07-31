@@ -41,11 +41,6 @@ router.post('/start', async (req, res) => {
 });
 
 router.post('/stream/message', (req, res) => {
-    storedMessage = req.body.message;
-    res.status(200).json({ message: "Message received", storedMessage });
-});
-
-router.post('/stream/message', (req, res) => {
   storedMessage = req.body.message;
   res.status(200).json({ message: "Message received", storedMessage });
 });

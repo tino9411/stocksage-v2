@@ -19,13 +19,13 @@ async function runTests() {
     //const companyProfile = await fetchCompanyProfile(symbol);
     //console.log('Company Profile:', companyProfile);
 
-    console.log(`Fetching historical data for ${symbol}...`);
+    /* console.log(`Fetching historical data for ${symbol}...`);
     const historicalData = await fetchHistoricalData(symbol);
-    console.log('Historical Data:', historicalData);
+    console.log('Historical Data:', historicalData); */
 
-    console.log(`Fetching real-time quote for ${symbol}...`);
+  /*   console.log(`Fetching real-time quote for ${symbol}...`);
     const realTimeQuote = await fetchRealTimeQuote(symbol);
-    console.log('Real-Time Quote:', realTimeQuote);
+    console.log('Real-Time Quote:', realTimeQuote); */
 
     //console.log(`Fetching income statement for ${symbol}...`);
     //const incomeStatement = await fetchIncomeStatement(symbol);
@@ -39,9 +39,9 @@ async function runTests() {
     //const cashFlowStatement = await fetchCashFlowStatement(symbol);
     //console.log('Cash Flow Statement:', cashFlowStatement);
 
-    console.log(`Fetching key metrics for ${symbol}...`);
+    /* console.log(`Fetching key metrics for ${symbol}...`);
     const keyMetrics = await fetchKeyMetrics(symbol);
-    console.log('Key Metrics:', keyMetrics);
+    console.log('Key Metrics:', keyMetrics); */
 
     console.log(`Calculating technical indicators for ${symbol}...`);
     const technicalIndicators = await calculateTechnicalIndicators(symbol);
@@ -54,11 +54,11 @@ async function runTests() {
     }
 
     //Update real-time quote
-    if (realTimeQuote) {
+  /*   if (realTimeQuote) {
         stock.real_time_quote = realTimeQuote;
     } else {
         console.warn(`No real-time quote data available for ${symbol}`);
-    }
+    } */
 
 
     // Update historical data

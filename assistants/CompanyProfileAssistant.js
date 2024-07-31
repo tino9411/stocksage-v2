@@ -2,6 +2,7 @@
 const BaseAssistantService = require('./BaseAssistantService');
 const { fetchCompanyProfile } = require('../tools/fetchCompanyProfile');
 const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
+const { fetchInsiderTradesSearch } = require('../tools/fetchInsiderTradesSearch');
 
 class CompanyProfileAssistant extends BaseAssistantService {
     constructor(apiKey) {
@@ -15,9 +16,11 @@ class CompanyProfileAssistant extends BaseAssistantService {
         4. Recent news or developments
         5. Key financial metrics (revenue, profit, market cap)
         6. Real-time stock quotes
+        7. Insider trading information
         
         Use the fetchCompanyProfile function to retrieve the most up-to-date information about a company.
         Use the fetchRealTimeQuote function to get the current stock price and related information.
+        Use the fetchInsiderTradesSearch function to get insider trading information for a company.
         If the information is not available or there's an error, inform the user and provide any alternative information you can.
         Always provide concise but comprehensive information.`;
     }
@@ -59,11 +62,33 @@ class CompanyProfileAssistant extends BaseAssistantService {
             }
         };
 
+        const fetchInsiderTradesSearchTool = {
+            type: "function",
+            function: {
+                name: "fetchInsiderTradesSearch",
+                description: "Fetch insider trades data for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol"
+                        },
+                        page: {
+                            type: "number",
+                            description: "The page number for pagination (default is 0)"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+
         const newAssistant = await this.createAssistant({
             model,
             name,
             instructions: this.instructions,
-            tools: [fetchCompanyProfileTool, fetchRealTimeQuoteTool]
+            tools: [fetchCompanyProfileTool, fetchRealTimeQuoteTool, fetchInsiderTradesSearchTool]
         });
         this.assistantId = newAssistant.id;
         console.log('Company Profile Assistant initialized:', newAssistant);
@@ -105,6 +130,8 @@ class CompanyProfileAssistant extends BaseAssistantService {
                         result = await fetchCompanyProfile(parsedArgs.symbol);
                     } else if (name === 'fetchRealTimeQuote') {
                         result = await fetchRealTimeQuote(parsedArgs.symbol);
+                    } else if (name === 'fetchInsiderTradesSearch') {
+                        result = await fetchInsiderTradesSearch(parsedArgs.symbol, parsedArgs.page || 0);
                     } else {
                         throw new Error(`Unknown function ${name}`);
                     }
