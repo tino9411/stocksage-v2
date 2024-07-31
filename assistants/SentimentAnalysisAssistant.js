@@ -5,6 +5,7 @@ const {
     fetchTrendingSocialSentiment,
     fetchSocialSentimentChanges
 } = require('../tools/fetchSentimentTools');
+const { fetchStockNews } = require('../tools/fetchStockNews');
 
 class SentimentAnalysisAssistant extends BaseAssistantService {
     constructor(apiKey) {
@@ -15,21 +16,24 @@ class SentimentAnalysisAssistant extends BaseAssistantService {
         1. Historical social sentiment data
         2. Trending social sentiment
         3. Changes in social sentiment over time
+        4. Latest stock news and press releases
         
         Use the provided functions to retrieve the most up-to-date sentiment information:
         - fetchHistoricalSocialSentiment: Get historical social sentiment data for a specific stock
         - fetchTrendingSocialSentiment: Get trending social sentiment data
         - fetchSocialSentimentChanges: Get changes in social sentiment over time
+        - fetchStockNews: Get the latest stock news or press releases for specific companies
         
         If the information is not available or there's an error, inform the user and provide any alternative information you can.
-        Always provide concise but comprehensive information, including your interpretation of the sentiment data.`;
+        Always provide concise but comprehensive information, including your interpretation of the sentiment data and news.`;
     }
 
     async initialize({ model, name }) {
         const tools = [
             this.createHistoricalSentimentTool(),
             this.createTrendingSentimentTool(),
-            this.createSentimentChangesTool()
+            this.createSentimentChangesTool(),
+            this.createStockNewsTool()
         ];
 
         const newAssistant = await this.createAssistant({
@@ -114,6 +118,52 @@ class SentimentAnalysisAssistant extends BaseAssistantService {
         };
     }
 
+    createStockNewsTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchStockNews",
+                description: "Fetch stock news or press releases for specific companies",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        tickers: {
+                            type: "string",
+                            description: "Comma-separated list of stock symbols (e.g., 'AAPL,FB')"
+                        },
+                        page: {
+                            type: "number",
+                            description: "Page number for pagination (default is 0)"
+                        },
+                        from: {
+                            type: "string",
+                            format: "date",
+                            description: "Start date for news (format: YYYY-MM-DD)"
+                        },
+                        to: {
+                            type: "string",
+                            format: "date",
+                            description: "End date for news (format: YYYY-MM-DD)"
+                        },
+                        limit: {
+                            type: "number",
+                            description: "Number of news items to return (max 50)"
+                        },
+                        isPressRelease: {
+                            type: "boolean",
+                            description: "Set to true to fetch press releases instead of news"
+                        },
+                        symbol: {
+                            type: "string",
+                            description: "Single stock symbol for press releases (required if isPressRelease is true)"
+                        }
+                    },
+                    required: ["tickers"]
+                }
+            }
+        };
+    }
+
     async processMessage(message, threadId) {
         console.log(`Processing message in SentimentAnalysisAssistant: ${message.content}`);
         try {
@@ -155,6 +205,9 @@ class SentimentAnalysisAssistant extends BaseAssistantService {
                             break;
                         case 'fetchSocialSentimentChanges':
                             result = await fetchSocialSentimentChanges(parsedArgs.type, parsedArgs.source);
+                            break;
+                        case 'fetchStockNews':
+                            result = await fetchStockNews(parsedArgs);
                             break;
                         default:
                             throw new Error(`Unknown function ${name}`);

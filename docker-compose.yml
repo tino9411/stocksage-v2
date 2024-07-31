@@ -1,0 +1,18 @@
+version: '3.8'
+services:
+  code_interpreter_1:
+    build: ./python/code_interpreter
+    ports:
+      - "5100:5000"
+    environment:
+      - FLASK_ENV=production
+    deploy:
+      replicas: 1
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+      restart_policy:
+        condition: on-failure
+
+  

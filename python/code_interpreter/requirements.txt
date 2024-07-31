@@ -1,0 +1,10 @@
+Flask
+requests-html
+lxml[html_clean]
+playwright
+matplotlib
+numpy
+plotly
+pandas
+kaleido
+flask-cors

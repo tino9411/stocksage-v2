@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Plotly Chart Generator</title>
+</head>
+<body>
+    <h1>Plotly Chart Generator</h1>
+    <form id="chartForm">
+        <label for="code">Enter Plotly Code:</label><br>
+        <textarea id="code" name="code" rows="10" cols="50">fig.add_trace(go.Scatter(x=[1, 2, 3], y=[4, 5, 6]))</textarea><br>
+        <input type="button" value="Generate Chart" onclick="generateChart()">
+    </form>
+    <div id="result"></div>
+    <script>
+        function generateChart() {
+            var code = document.getElementById('code').value;
+            var xhr = new XMLHttpRequest();
+            xhr.open('POST', 'http://localhost:5100/generate_chart', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.onreadystatechange = function () {
+                if (xhr.readyState == 4 && xhr.status == 200) {
+                    var url = URL.createObjectURL(new Blob([xhr.response], { type: 'text/html' }));
+                    document.getElementById('result').innerHTML = '<iframe src="' + url + '" width="800" height="600"></iframe>';
+                } else if (xhr.readyState == 4) {
+                    alert('Error: ' + xhr.responseText);
+                }
+            };
+            xhr.responseType = 'blob';
+            xhr.send(JSON.stringify({ code: code }));
+        }
+    </script>
+</body>
+</html>
