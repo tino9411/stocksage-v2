@@ -1,6 +1,7 @@
 const axios = require('axios');
 const WebSocket = require('ws');
 const Stock = require('../models/Stock');
+const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
 
 const FMP_API_KEY = process.env.FMP_API_KEY;
 const FMP_BASE_URL = 'https://financialmodelingprep.com/api/v3';
@@ -87,13 +88,11 @@ class StockService {
         Array.from(this.watchlist).map(async (symbol) => {
           const stock = await Stock.findOne({ symbol });
           if (stock) {
+            const realTimeQuote = await fetchRealTimeQuote(symbol);
             return {
               symbol: stock.symbol,
               companyName: stock.companyName,
-              price: stock.price || 0,
-              change: stock.change || 0,
-              changePercent: stock.changePercent || 0,
-              previousClose: stock.previousClose || 0
+              ...realTimeQuote
             };
           }
           return null;
@@ -109,6 +108,13 @@ class StockService {
   removeFromWatchlist(symbol) {
     this.watchlist.delete(symbol);
     // Unsubscribe from real-time quotes for this symbol if needed
+    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+      const unsubscribeMessage = JSON.stringify({
+        event: 'unsubscribe',
+        data: { ticker: symbol }
+      });
+      this.ws.send(unsubscribeMessage);
+    }
   }
 
   async fetchCompanyProfile(symbol) {
@@ -119,15 +125,10 @@ class StockService {
       }
 
       const profileUrl = `${FMP_BASE_URL}/profile/${symbol}?apikey=${FMP_API_KEY}`;
-      const quoteUrl = `${FMP_BASE_URL}/quote/${symbol}?apikey=${FMP_API_KEY}`;
+      const realTimeQuote = await fetchRealTimeQuote(symbol);
       
-      const [profileResponse, quoteResponse] = await Promise.all([
-        axios.get(profileUrl),
-        axios.get(quoteUrl)
-      ]);
-
+      const profileResponse = await axios.get(profileUrl);
       const profileData = profileResponse.data[0];
-      const quoteData = quoteResponse.data[0];
 
       if (!profileData) {
         return null;
@@ -136,11 +137,8 @@ class StockService {
       stock = new Stock({
         symbol: profileData.symbol,
         companyName: profileData.companyName,
-        price: quoteData.price,
-        change: quoteData.change,
-        changePercent: quoteData.changesPercentage,
-        previousClose: quoteData.previousClose,
-        // Add other fields as needed
+        ...realTimeQuote,
+        // Add other fields from profileData as needed
       });
 
       await stock.save();
