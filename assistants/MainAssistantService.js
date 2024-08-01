@@ -31,6 +31,7 @@ class MainAssistantService extends BaseAssistantService {
         8. A summary and recommendation (buy, sell or hold). Include a recommended entry price.
         
         When you need specific information, use the messageSubAssistant function to request it from the appropriate sub-assistant.
+        When you need to perform complex calculations or data analysis, use the Code Interpreter to write and run Python code.
         Always provide clear explanations and justify your analysis.
         Be conversational and engaging in your responses. Remember the context of the ongoing conversation.`;
     }
@@ -73,10 +74,13 @@ class MainAssistantService extends BaseAssistantService {
             model,
             name,
             instructions: this.instructions,
-            tools: [messageSubAssistantTool]
+            tools: [
+                messageSubAssistantTool,
+                { type: "code_interpreter" }
+            ]
         });
         this.assistantId = newAssistant.id;
-        this.logSystemEvent('Main Assistant initialized');
+        this.logSystemEvent('Main Assistant initialized with Code Interpreter');
     }
 
     // Method to get the tool for messaging sub-assistants
@@ -151,23 +155,21 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     async chatWithAssistant(thread_id, assistant_id, userMessage, stream = false) {
-        // Call the base class implementation first
         const baseResponse = await super.chatWithAssistant(thread_id, assistant_id, userMessage, stream);
-
-        // If streaming is enabled, return the base response as is
+    
         if (stream) {
             return baseResponse;
         }
-
-        // For non-streaming responses, check if we need to process sub-assistant responses
+    
         if (baseResponse) {
-            // Check if the response contains any indicators that sub-assistant information is needed
+            await this.processCodeInterpreterOutput(baseResponse);
+    
             if (this.responseRequiresSubAssistant(baseResponse)) {
                 const enhancedResponse = await this.enhanceResponseWithSubAssistantInfo(baseResponse, thread_id);
                 return enhancedResponse;
             }
         }
-
+    
         return baseResponse;
     }
 
@@ -350,6 +352,40 @@ class MainAssistantService extends BaseAssistantService {
             },
             content: `Error: Unable to process message. ${error.message}`
         };
+    }
+
+    async processCodeInterpreterOutput(message) {
+        // Check if message.content is an array (new structure) or a string (old structure)
+        const contents = Array.isArray(message.content) ? message.content : [{ type: 'text', text: { value: message.content } }];
+    
+        for (const content of contents) {
+            if (content.type === 'image_file') {
+                const fileId = content.image_file.file_id;
+                await this.downloadAndSaveFile(fileId, 'image');
+            } else if (content.type === 'text') {
+                const text = content.text.value || content.text;
+                if (text && typeof text === 'object' && text.annotations) {
+                    for (const annotation of text.annotations) {
+                        if (annotation.type === 'file_path') {
+                            const fileId = annotation.file_path.file_id;
+                            await this.downloadAndSaveFile(fileId, 'data');
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    async downloadAndSaveFile(fileId, type) {
+        try {
+            const response = await this.client.files.content(fileId);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            const fileName = `${type}_${fileId}.${type === 'image' ? 'png' : 'csv'}`;
+            fs.writeFileSync(fileName, buffer);
+            this.logSystemEvent(`File saved: ${fileName}`);
+        } catch (error) {
+            this.logSystemEvent(`Error downloading file ${fileId}: ${error.message}`);
+        }
     }
 
     // Method to delete all assistants (main and sub-assistants)
