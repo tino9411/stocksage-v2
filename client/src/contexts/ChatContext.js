@@ -195,6 +195,33 @@ export const ChatProvider = ({ children }) => {
     setToolCalls([]);
   }, []);
 
+  const uploadFiles = useCallback(async (files) => {
+    if (!isInitialized || !isConversationStarted) {
+      throw new Error('Assistant not initialized or conversation not started');
+    }
+  
+    const formData = new FormData();
+    files.forEach((file, index) => {
+      formData.append(`files`, file);
+    });
+  
+    try {
+      addLog('Uploading files...');
+      const response = await axiosInstance.post('/api/chat/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+      addLog('Files uploaded successfully');
+      addServerLogs(response.data.logs);
+      return response.data.fileIds;
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      addLog('Error uploading files');
+      throw error;
+    }
+  }, [isInitialized, isConversationStarted, addLog, addServerLogs]);
+
   const endChat = useCallback(async () => {
     try {
       addLog('Ending chat...');
@@ -234,8 +261,19 @@ export const ChatProvider = ({ children }) => {
     toolCalls,
     updateToolCallOutput,
     clearToolCalls,
-    isWaitingForToolCompletion
-  }), [messages, isInitialized, isConversationStarted, initializeAssistant, startConversation, sendMessage, endChat, logs, addLog, isStreaming, isToolCallInProgress, toolCalls, updateToolCallOutput, clearToolCalls, isWaitingForToolCompletion]);
+    isWaitingForToolCompletion,
+    uploadFiles
+  }), [messages, 
+      isInitialized, 
+      isConversationStarted, 
+      initializeAssistant, 
+      startConversation, 
+      sendMessage, 
+      endChat, 
+      logs, 
+      addLog, 
+      isStreaming, 
+      isToolCallInProgress, toolCalls, updateToolCallOutput, clearToolCalls, isWaitingForToolCompletion, uploadFiles]);
 
   return (
     <ChatContext.Provider value={contextValue}>

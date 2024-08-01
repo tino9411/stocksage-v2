@@ -122,7 +122,6 @@ class BaseAssistantService extends EventEmitter {
         }
     }
 
-
     async createThread({ messages = [], tool_resources = null, metadata = {} }) {
         try {
             const threadOptions = {
@@ -370,9 +369,10 @@ class BaseAssistantService extends EventEmitter {
             if (stream) {
                 return this.handleRunStatusStream(thread_id, run, assistant_id);
             } else {
-                const response = await this.handleRunStatus(thread_id, run, false);
+                let response = await this.handleRunStatus(thread_id, run, false);
                 if (response) {
                     console.log('\x1b[32m[Assistant Responded]\x1b[0m');
+                    response = await this.processCodeInterpreterOutput(response);
                     return response;
                 } else {
                     console.log('\x1b[31m[No Response]\x1b[0m');
@@ -383,6 +383,58 @@ class BaseAssistantService extends EventEmitter {
             console.error('\x1b[31m[Error]\x1b[0m', error);
             throw error;
         }
+    }
+
+    async downloadFile(fileId) {
+        try {
+            const response = await this.client.files.content(fileId);
+            const buffer = Buffer.from(await response.arrayBuffer());
+            return buffer;
+        } catch (error) {
+            console.error(`Error downloading file ${fileId}:`, error);
+            throw error;
+        }
+    }
+
+    async saveFile(buffer, fileName) {
+        const uploadsDir = path.join(__dirname, '..', 'public', 'uploads');
+        if (!fs.existsSync(uploadsDir)) {
+            fs.mkdirSync(uploadsDir, { recursive: true });
+        }
+        const filePath = path.join(uploadsDir, fileName);
+        fs.writeFileSync(filePath, buffer);
+        return `/uploads/${fileName}`;
+    }
+
+    async processCodeInterpreterOutput(message) {
+        if (Array.isArray(message.content)) {
+            for (let i = 0; i < message.content.length; i++) {
+                const content = message.content[i];
+                if (content.type === 'image_file') {
+                    const fileId = content.image_file.file_id;
+                    const buffer = await this.downloadFile(fileId);
+                    const fileName = `image_${fileId}.png`;
+                    const url = await this.saveFile(buffer, fileName);
+                    content.image_file.url = url;
+                } else if (content.type === 'text') {
+                    if (content.text.annotations) {
+                        for (const annotation of content.text.annotations) {
+                            if (annotation.type === 'file_path') {
+                                const fileId = annotation.file_path.file_id;
+                                const buffer = await this.downloadFile(fileId);
+                                const fileName = `file_${fileId}.csv`;
+                                const url = await this.saveFile(buffer, fileName);
+                                content.text.value = content.text.value.replace(
+                                    annotation.text,
+                                    `[${annotation.text}](${url})`
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return message;
     }
 
 

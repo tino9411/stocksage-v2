@@ -13,20 +13,27 @@ class Chat extends EventEmitter {
       this.currentStream = null;
   }
 
-  async initializeAssistant({ model, name }) {
-      if (!this.isInitialized) {
-          try {
-              this.mainAssistant = new MainAssistantService(this.apiKey);
-              await this.mainAssistant.initialize({ model, name });
-              this.isInitialized = true;
-              return this.mainAssistant.getAndClearSystemLogs();
-          } catch (error) {
-              console.error('Failed to initialize assistant:', error);
-              this.isInitialized = false;
-              throw error;
-          }
-      }
-  }
+  async initializeAssistant({ model, name, files = [] }) {
+    if (!this.isInitialized) {
+        try {
+            this.mainAssistant = new MainAssistantService(this.apiKey);
+            await this.mainAssistant.initialize({ model, name });
+            
+            if (files.length > 0) {
+                const fileIds = await Promise.all(files.map(file => this.uploadFile(file)));
+                const vectorStoreId = await this.createVectorStore("InitialVectorStore", fileIds);
+                await this.attachVectorStoreToAssistant(vectorStoreId);
+            }
+            
+            this.isInitialized = true;
+            return this.mainAssistant.getAndClearSystemLogs();
+        } catch (error) {
+            console.error('Failed to initialize assistant:', error);
+            this.isInitialized = false;
+            throw error;
+        }
+    }
+}
 
   async startConversation(initialMessage) {
       this.ensureInitialized();
@@ -124,6 +131,41 @@ class Chat extends EventEmitter {
           onEvent({ type: 'error', data: error.message });
       }
   }
+
+  async uploadFile(filePath) {
+    this.ensureInitialized();
+    return await this.mainAssistant.uploadFile(filePath);
+}
+
+async createVectorStore(name, fileIds) {
+    this.ensureInitialized();
+    return await this.mainAssistant.createVectorStore(name, fileIds);
+}
+
+async attachVectorStoreToAssistant(vectorStoreId) {
+    this.ensureInitialized();
+    return await this.mainAssistant.attachVectorStoreToAssistant(vectorStoreId);
+}
+
+async addFileToVectorStore(vectorStoreName, filePath) {
+    this.ensureInitialized();
+    return await this.mainAssistant.addFileToVectorStore(vectorStoreName, filePath);
+}
+
+async addFilesToConversation(files) {
+  this.ensureConversationStarted();
+  const fileIds = await Promise.all(files.map(file => this.uploadFile(file)));
+  const vectorStoreName = `ConversationStore_${this.threadId}`;
+  await this.createVectorStore(vectorStoreName, fileIds);
+  await this.mainAssistant.client.beta.threads.update(this.threadId, {
+      tool_resources: {
+          file_search: {
+              vector_store_ids: [this.mainAssistant.vectorStores[vectorStoreName]]
+          }
+      }
+  });
+  return fileIds;
+}
 
   async endConversation() {
       if (this.mainAssistant) {

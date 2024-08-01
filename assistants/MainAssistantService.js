@@ -5,6 +5,10 @@ const FinancialAnalysisAssistant = require('./FinancialAnalysisAssistant');
 const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 const EconomicDataAssistant = require('./EconomicDataAssistant');
 const SentimentAnalysisAssistant = require('./SentimentAnalysisAssistant');
+const path = require('path');
+const fs = require('fs');
+const mime = require('mime-types');
+
 
 class MainAssistantService extends BaseAssistantService {
     constructor(apiKey) {
@@ -13,6 +17,7 @@ class MainAssistantService extends BaseAssistantService {
         this.assistantName = 'MainAssistant';
         this.subAssistants = {};
         this.subAssistantThreads = {};
+        this.vectorStores = {};
         this.instructions = this.getInstructions();
     }
 
@@ -76,11 +81,12 @@ class MainAssistantService extends BaseAssistantService {
             instructions: this.instructions,
             tools: [
                 messageSubAssistantTool,
-                { type: "code_interpreter" }
+                { type: "code_interpreter" },
+                { type: "file_search" }  // Add this line
             ]
         });
         this.assistantId = newAssistant.id;
-        this.logSystemEvent('Main Assistant initialized with Code Interpreter');
+        this.logSystemEvent('Main Assistant initialized with Code Interpreter and File Search');
     }
 
     // Method to get the tool for messaging sub-assistants
@@ -155,30 +161,213 @@ class MainAssistantService extends BaseAssistantService {
     }
 
     async chatWithAssistant(thread_id, assistant_id, userMessage, stream = false) {
-        const baseResponse = await super.chatWithAssistant(thread_id, assistant_id, userMessage, stream);
+        try {
+            const baseResponse = await super.chatWithAssistant(thread_id, assistant_id, userMessage, stream);
     
-        if (stream) {
-            return baseResponse;
-        }
-    
-        if (baseResponse) {
-            await this.processCodeInterpreterOutput(baseResponse);
-    
-            if (this.responseRequiresSubAssistant(baseResponse)) {
-                const enhancedResponse = await this.enhanceResponseWithSubAssistantInfo(baseResponse, thread_id);
-                return enhancedResponse;
+            if (stream) {
+                return baseResponse;
             }
-        }
     
-        return baseResponse;
+            if (baseResponse) {
+                const processedResponse = await this.processCodeInterpreterOutput(baseResponse);
+    
+                if (this.responseRequiresSubAssistant(processedResponse)) {
+                    const enhancedResponse = await this.enhanceResponseWithSubAssistantInfo(processedResponse, thread_id);
+                    return enhancedResponse;
+                }
+    
+                return processedResponse;
+            }
+    
+            return baseResponse;
+        } catch (error) {
+            this.logSystemEvent(`Error in chatWithAssistant: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async createVectorStore(name, files) {
+        try {
+          const vectorStore = await this.client.beta.vectorStores.create({
+            name: name,
+            file_ids: files.map(file => file.id)
+          });
+          this.vectorStores[name] = vectorStore.id;
+          this.logSystemEvent(`Vector store created: ${vectorStore.id}`);
+          return vectorStore.id;
+        } catch (error) {
+          this.logSystemEvent(`Error creating vector store: ${error.message}`);
+          throw error;
+        }
+      }
+      
+      async uploadFile(filePath) {
+        const fileName = path.basename(filePath);
+        const fileStream = fs.createReadStream(filePath);
+        const mimeType = mime.lookup(filePath) || 'application/octet-stream';
+      
+        const file = await this.client.files.create({
+          file: fileStream,
+          purpose: 'assistants',
+          // Remove the file_name parameter
+        });
+      
+        this.logSystemEvent(`File uploaded: ${file.id} (${fileName})`);
+        return { id: file.id, name: fileName, mimeType };
+      }
+
+      async attachVectorStoreToAssistant(vectorStoreId) {
+        try {
+          await this.client.beta.assistants.update(this.assistantId, {
+            tool_resources: { 
+              file_search: { 
+                vector_store_ids: [vectorStoreId] 
+              } 
+            }
+          });
+          this.logSystemEvent(`Vector store ${vectorStoreId} attached to assistant ${this.assistantId}`);
+        } catch (error) {
+          this.logSystemEvent(`Error attaching vector store to assistant: ${error.message}`);
+          throw error;
+        }
+      }
+
+    async addFileToVectorStore(vectorStoreName, filePath) {
+        const fileId = await this.uploadFile(filePath);
+        const vectorStoreId = this.vectorStores[vectorStoreName];
+        if (!vectorStoreId) {
+            throw new Error(`Vector store ${vectorStoreName} not found`);
+        }
+        await this.client.beta.vectorStores.files.create(vectorStoreId, { file_id: fileId });
+        this.logSystemEvent(`File ${fileId} added to vector store ${vectorStoreName}`);
+        return fileId;
+    }
+
+    async addFilesToConversation(filePaths) {
+        try {
+          const files = await Promise.all(filePaths.map(filePath => this.uploadFile(filePath)));
+          const vectorStoreName = `ConversationStore_${this.threadId}`;
+          const vectorStoreId = await this.createVectorStore(vectorStoreName, files);
+          await this.attachVectorStoreToAssistant(vectorStoreId);
+          return files.map(file => ({ id: file.id, name: file.name }));
+        } catch (error) {
+          console.error('Error adding files to conversation:', error);
+          if (error.response && error.response.data) {
+            console.error('API Error Details:', error.response.data);
+          }
+          throw error;
+        }
+      }
+    
+    async createVectorStoreForConversation(name, fileIds, threadId) {
+        const vectorStoreId = await this.createVectorStore(name, fileIds);
+        await this.client.beta.threads.update(threadId, {
+            tool_resources: {
+                file_search: {
+                    vector_store_ids: [vectorStoreId]
+                }
+            }
+        });
+        this.logSystemEvent(`Vector store ${vectorStoreId} created and attached to thread ${threadId}`);
+        return vectorStoreId;
     }
 
     responseRequiresSubAssistant(response) {
-        // Implement logic to determine if the response needs sub-assistant input
-        // This could be based on keywords, specific phrases, or other criteria
         const subAssistantKeywords = ['company profile', 'financial analysis', 'technical analysis'];
-        return subAssistantKeywords.some(keyword => response.toLowerCase().includes(keyword));
+        
+        if (typeof response === 'string') {
+            return subAssistantKeywords.some(keyword => response.toLowerCase().includes(keyword));
+        } else if (response && response.content) {
+            return response.content.some(content => {
+                if (content.type === 'text') {
+                    const text = content.text.value || content.text;
+                    return typeof text === 'string' && subAssistantKeywords.some(keyword => text.toLowerCase().includes(keyword));
+                }
+                return false;
+            });
+        }
+        
+        return false;
     }
+
+    async processCodeInterpreterOutput(message) {
+        this.logSystemEvent(`Processing Code Interpreter output: ${JSON.stringify(message)}`);
+        
+        if (typeof message === 'string') {
+            this.logSystemEvent('Message is a string, returning as-is');
+            return message;
+        }
+    
+        if (!message || !message.content) {
+            this.logSystemEvent('Message is empty or has no content, returning as-is');
+            return message;
+        }
+    
+        const contents = Array.isArray(message.content) ? message.content : [message.content];
+    
+        for (const content of contents) {
+            if (content.type === 'image_file') {
+                this.logSystemEvent(`Processing image file: ${JSON.stringify(content.image_file)}`);
+                const fileId = content.image_file.file_id;
+                const imageUrl = await this.downloadAndSaveFile(fileId, 'image');
+                if (imageUrl) {
+                    content.image_file.url = imageUrl;
+                    this.logSystemEvent(`Image URL set to: ${imageUrl}`);
+                }
+            } else if (content.type === 'text') {
+                const text = content.text.value || content.text;
+                if (text && typeof text === 'object' && text.annotations) {
+                    for (const annotation of text.annotations) {
+                        if (annotation.type === 'file_path') {
+                            this.logSystemEvent(`Processing file path annotation: ${JSON.stringify(annotation)}`);
+                            const fileId = annotation.file_path.file_id;
+                            const fileUrl = await this.downloadAndSaveFile(fileId, 'data');
+                            if (fileUrl) {
+                                text.value = text.value.replace(
+                                    annotation.text,
+                                    `[${annotation.text}](${fileUrl})`
+                                );
+                                this.logSystemEvent(`File URL set to: ${fileUrl}`);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    
+        return message;
+    }
+
+    async downloadAndSaveFile(fileId, type) {
+        try {
+            console.log(`Attempting to download file: ${fileId}`);
+            const response = await this.client.files.content(fileId);
+            console.log(`File content retrieved for: ${fileId}`);
+            
+            const buffer = Buffer.from(await response.arrayBuffer());
+            const fileName = `${type}_${fileId}.${type === 'image' ? 'png' : 'csv'}`;
+            
+            const uploadsDir = path.join(__dirname, '..', 'public', 'uploads');
+            console.log(`Uploads directory: ${uploadsDir}`);
+            
+            if (!fs.existsSync(uploadsDir)) {
+                console.log(`Creating uploads directory: ${uploadsDir}`);
+                fs.mkdirSync(uploadsDir, { recursive: true });
+            }
+            
+            const filePath = path.join(uploadsDir, fileName);
+            console.log(`Saving file to: ${filePath}`);
+            
+            fs.writeFileSync(filePath, buffer);
+            console.log(`File saved successfully: ${filePath}`);
+            
+            return `/api/files/${fileName}`;
+        } catch (error) {
+            console.error(`Error downloading file ${fileId}:`, error);
+            return null;
+        }
+    }
+
 
     async enhanceResponseWithSubAssistantInfo(baseResponse, thread_id) {
         let enhancedResponse = baseResponse;
@@ -352,40 +541,6 @@ class MainAssistantService extends BaseAssistantService {
             },
             content: `Error: Unable to process message. ${error.message}`
         };
-    }
-
-    async processCodeInterpreterOutput(message) {
-        // Check if message.content is an array (new structure) or a string (old structure)
-        const contents = Array.isArray(message.content) ? message.content : [{ type: 'text', text: { value: message.content } }];
-    
-        for (const content of contents) {
-            if (content.type === 'image_file') {
-                const fileId = content.image_file.file_id;
-                await this.downloadAndSaveFile(fileId, 'image');
-            } else if (content.type === 'text') {
-                const text = content.text.value || content.text;
-                if (text && typeof text === 'object' && text.annotations) {
-                    for (const annotation of text.annotations) {
-                        if (annotation.type === 'file_path') {
-                            const fileId = annotation.file_path.file_id;
-                            await this.downloadAndSaveFile(fileId, 'data');
-                        }
-                    }
-                }
-            }
-        }
-    }
-    
-    async downloadAndSaveFile(fileId, type) {
-        try {
-            const response = await this.client.files.content(fileId);
-            const buffer = Buffer.from(await response.arrayBuffer());
-            const fileName = `${type}_${fileId}.${type === 'image' ? 'png' : 'csv'}`;
-            fs.writeFileSync(fileName, buffer);
-            this.logSystemEvent(`File saved: ${fileName}`);
-        } catch (error) {
-            this.logSystemEvent(`Error downloading file ${fileId}: ${error.message}`);
-        }
     }
 
     // Method to delete all assistants (main and sub-assistants)

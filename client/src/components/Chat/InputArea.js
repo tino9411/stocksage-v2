@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef } from 'react';
 import SendIcon from '@mui/icons-material/Send';
 import { useChatState } from '../../hooks/useChatState';
 import { InputArea, StyledTextField, StyledButton } from '../../styles/chatStyles';
-import { Popper, Paper, Typography, ClickAwayListener } from '@mui/material';
+import { Popper, Paper, Typography, ClickAwayListener, IconButton } from '@mui/material';
 import { styled } from '@mui/system';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 
 const commands = [
   { command: '/analyse', description: 'Provide a comprehensive analysis of a stock' },
@@ -67,10 +68,11 @@ function InputAreaComponent() {
   const [showCommands, setShowCommands] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming } = useChatState();
+  const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming, uploadFiles } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
   const commandListRef = useRef(null);
+  const fileInputRef = useRef(null);
 
   useEffect(() => {
     if (input.startsWith('/')) {
@@ -109,6 +111,20 @@ function InputAreaComponent() {
       }
     }
   };
+
+  const handleFileUpload = async (event) => {
+    const files = Array.from(event.target.files);
+    if (files.length > 0) {
+      try {
+        const fileIds = await uploadFiles(files);
+        addLog(`Uploaded files: ${fileIds.join(', ')}`);
+        setInput((prevInput) => `${prevInput} (Uploaded files: ${files.map(f => f.name).join(', ')})`);
+      } catch (error) {
+        addLog(`Error uploading files: ${error.message}`);
+      }
+    }
+  };
+
 
   const handleKeyDown = (e) => {
     if (showCommands) {
@@ -202,6 +218,20 @@ function InputAreaComponent() {
             </Paper>
           </CommandPopper>
         </div>
+        <input
+          type="file"
+          multiple
+          style={{ display: 'none' }}
+          ref={fileInputRef}
+          onChange={handleFileUpload}
+        />
+        <IconButton
+          onClick={() => fileInputRef.current.click()}
+          disabled={!isInitialized || isStreaming}
+          style={{ marginRight: '8px' }}
+        >
+          <AttachFileIcon />
+        </IconButton>
         <StyledButton
           variant="contained"
           onClick={handleSendMessage}

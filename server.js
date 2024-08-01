@@ -15,6 +15,8 @@ const executeService = require('./utils/serviceExecutor');
 const Chat = require('./services/Chat');
 const commandRoutes = require('./routes/command');
 const Stock = require('./services/StockService');
+const fileRoutes = require('./routes/file');
+
 
 const app = express();
 
@@ -74,6 +76,7 @@ app.use('/api/stocks', stockRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRouter);
 app.use('/api/command', commandRoutes);
+app.use(fileRoutes);
 
 // Auth routes
 app.get('/auth/google',
@@ -133,6 +136,8 @@ wss.on('connection', (ws) => {
 
 // Initialize Stock service with WebSocket server
 Stock.initializeWebSocket(wss);
+
+app.use(express.static(path.join(__dirname, 'public')));
 
 server.listen(port, () => {
   console.log(`Server is running on port ${port}`);

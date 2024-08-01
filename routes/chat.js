@@ -3,6 +3,11 @@ const router = express.Router();
 const Chat = require('../services/chat');
 require('dotenv').config();
 const chat = new Chat(process.env.OPENAI_API_KEY);
+const multer = require('multer');
+const upload = multer({ dest: 'uploads/' });
+const path = require('path');
+const fs = require('fs');
+
 
 // Helper function to process assistant response
 function processAssistantResponse(text) {
@@ -39,6 +44,28 @@ router.post('/start', async (req, res) => {
     res.status(500).json({ error: "Failed to start conversation" });
   }
 });
+
+router.post('/upload', upload.array('files'), async (req, res) => {
+  try {
+    if (!req.files || req.files.length === 0) {
+      return res.status(400).json({ error: "No files uploaded" });
+    }
+    
+    const filePaths = req.files.map(file => {
+      const originalName = file.originalname;
+      const newPath = path.join(path.dirname(file.path), originalName);
+      fs.renameSync(file.path, newPath);
+      return newPath;
+    });
+
+    const uploadedFiles = await chat.addFilesToConversation(filePaths);
+    res.json({ message: "Files uploaded successfully", files: uploadedFiles });
+  } catch (error) {
+    console.error('Error uploading files:', error);
+    res.status(500).json({ error: "Failed to upload files", details: error.message });
+  }
+});
+
 
 router.post('/stream/message', (req, res) => {
   storedMessage = req.body.message;
@@ -104,7 +131,6 @@ router.get('/stream', async (req, res) => {
       storedMessage = null;
   }
 });
-
 
 router.post('/end', async (req, res) => {
     try {

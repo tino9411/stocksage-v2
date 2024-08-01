@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Typography, Table, TableBody, TableCell, TableHead, TableRow, Box } from '@mui/material';
+import { Typography, Table, TableBody, TableCell, TableHead, TableRow, Box, Link, Button } from '@mui/material';
 import { styled, keyframes } from '@mui/system';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
@@ -50,6 +50,25 @@ const CodeBlock = styled(Box)(({ theme }) => ({
     },
   },
 }));
+
+const FileLink = ({ href, children }) => {
+  const fileId = href.split('/').pop();
+  const apiUrl = `/api/files/${fileId}`;
+
+  return (
+    <Button
+      component="a"
+      href={apiUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      variant="outlined"
+      size="small"
+      sx={{ margin: '0 4px' }}
+    >
+      {children}
+    </Button>
+  );
+};
 
 const FormattedMessage = ({ content, isStreaming }) => {
 
@@ -108,6 +127,19 @@ const FormattedMessage = ({ content, isStreaming }) => {
     tr: TableRow,
     td: TableCell,
     th: (props) => <TableCell {...props} style={{ fontWeight: 'bold' }} />,
+
+    img: ({ node, ...props }) => (
+      <Box component="span" sx={{ display: 'block', maxWidth: '100%', margin: '1em 0' }}>
+        <img style={{ maxWidth: '100%', height: 'auto' }} {...props} alt={props.alt || 'Generated image'} />
+      </Box>
+    ),
+    a: ({ node, ...props }) => {
+      const href = props.href;
+      if (href.startsWith('sandbox:/')) {
+        return <FileLink href={href} {...props} />;
+      }
+      return <Link {...props} target="_blank" rel="noopener noreferrer" />;
+    },
   }), []);
 
   const blink = keyframes`
