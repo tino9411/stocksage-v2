@@ -8,6 +8,8 @@ const SentimentAnalysisAssistant = require('./SentimentAnalysisAssistant');
 const path = require('path');
 const fs = require('fs');
 const mime = require('mime-types');
+const os = require('os');
+
 
 
 class MainAssistantService extends BaseAssistantService {
@@ -19,6 +21,9 @@ class MainAssistantService extends BaseAssistantService {
         this.subAssistantThreads = {};
         this.vectorStores = {};
         this.instructions = this.getInstructions();
+        this.threadVectorStores = {}; // Add this line to keep track of vector stores per thread
+        this.currentThreadId = null;
+
     }
 
     getInstructions() {
@@ -75,12 +80,14 @@ class MainAssistantService extends BaseAssistantService {
 
     async initializeMainAssistant(model, name) {
         const messageSubAssistantTool = this.getMessageSubAssistantTool();
+        const uploadFileTool = this.getUploadFileTool();
         const newAssistant = await this.createAssistant({
             model,
             name,
             instructions: this.instructions,
             tools: [
                 messageSubAssistantTool,
+                uploadFileTool,
                 { type: "code_interpreter" },
                 { type: "file_search" }  // Add this line
             ]
@@ -110,6 +117,30 @@ class MainAssistantService extends BaseAssistantService {
                         }
                     },
                     required: ["subAssistantName", "message"]
+                }
+            }
+        };
+    }
+
+    getUploadFileTool() {
+        return {
+            type: "function",
+            function: {
+                name: "uploadFile",
+                description: "Upload a file to the conversation.",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        fileName: {
+                            type: "string",
+                            description: "The name of the file to be created"
+                        },
+                        content: {
+                            type: "string",
+                            description: "The content of the file"
+                        }
+                    },
+                    required: ["fileName", "content"]
                 }
             }
         };
@@ -188,6 +219,7 @@ class MainAssistantService extends BaseAssistantService {
 
     async createVectorStore(name, files) {
         try {
+          this.logSystemEvent(`Creating vector store with files: ${JSON.stringify(files.map(f => ({ id: f.id, name: f.name, mimeType: f.mimeType })))}`);
           const vectorStore = await this.client.beta.vectorStores.create({
             name: name,
             file_ids: files.map(file => file.id)
@@ -206,13 +238,14 @@ class MainAssistantService extends BaseAssistantService {
         const fileStream = fs.createReadStream(filePath);
         const mimeType = mime.lookup(filePath) || 'application/octet-stream';
       
+        this.logSystemEvent(`Uploading file: ${fileName} (MIME: ${mimeType})`);
+      
         const file = await this.client.files.create({
           file: fileStream,
           purpose: 'assistants',
-          // Remove the file_name parameter
         });
       
-        this.logSystemEvent(`File uploaded: ${file.id} (${fileName})`);
+        this.logSystemEvent(`File uploaded: ${file.id} (${fileName}, MIME: ${mimeType})`);
         return { id: file.id, name: fileName, mimeType };
       }
 
@@ -232,15 +265,38 @@ class MainAssistantService extends BaseAssistantService {
         }
       }
 
-    async addFileToVectorStore(vectorStoreName, filePath) {
-        const fileId = await this.uploadFile(filePath);
-        const vectorStoreId = this.vectorStores[vectorStoreName];
-        if (!vectorStoreId) {
-            throw new Error(`Vector store ${vectorStoreName} not found`);
+      async addFilesToVectorStore(threadId, files) {
+        if (!threadId) {
+            throw new Error('Thread ID is required to add files to vector store');
         }
-        await this.client.beta.vectorStores.files.create(vectorStoreId, { file_id: fileId });
-        this.logSystemEvent(`File ${fileId} added to vector store ${vectorStoreName}`);
-        return fileId;
+
+        let vectorStoreId = this.threadVectorStores[threadId];
+        const vectorStoreName = `ConversationStore_${threadId}`;
+
+        if (!vectorStoreId) {
+            // Create a new vector store if one doesn't exist for this thread
+            vectorStoreId = await this.createVectorStore(vectorStoreName, files);
+            this.threadVectorStores[threadId] = vectorStoreId;
+        } else {
+            // Add files to the existing vector store
+            for (const file of files) {
+                await this.client.beta.vectorStores.files.create(vectorStoreId, { file_id: file.id });
+            }
+        }
+
+        // Update the assistant with the vector store
+        await this.attachVectorStoreToAssistant(vectorStoreId);
+
+        // Update the thread with the vector store
+        await this.client.beta.threads.update(threadId, {
+            tool_resources: {
+                file_search: {
+                    vector_store_ids: [vectorStoreId]
+                }
+            }
+        });
+
+        return vectorStoreId;
     }
 
     async addFilesToConversation(filePaths) {
@@ -435,9 +491,26 @@ class MainAssistantService extends BaseAssistantService {
 
         switch (name) {
             case 'messageSubAssistant':
-                const response = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
-                this.logSystemEvent(`Tool call response: ${JSON.stringify(response)}`);
-                return response;
+                    const response = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
+                    this.logSystemEvent(`Tool call response: ${JSON.stringify(response)}`);
+                    return response;
+            case 'uploadFile':
+                try {
+                    const { fileName, content } = parsedArgs;
+                    const filePath = path.join(os.tmpdir(), fileName);
+                    fs.writeFileSync(filePath, content);
+                    const uploadedFile = await this.uploadFile(filePath);
+                    if (this.currentThreadId) {
+                        await this.addFilesToVectorStore(this.currentThreadId, [uploadedFile]);
+                    } else {
+                        this.logSystemEvent('Warning: No current thread ID available. File uploaded but not added to vector store.');
+                    }
+                    fs.unlinkSync(filePath); // Clean up the temporary file
+                    return `File ${fileName} uploaded successfully`;
+                } catch (error) {
+                    this.logSystemEvent(`Error uploading file: ${error.message}`);
+                    return `Error uploading file: ${error.message}`;
+                }
             default:
                 throw new Error(`Unknown function ${name}`);
         }
@@ -552,6 +625,8 @@ class MainAssistantService extends BaseAssistantService {
         this.logSystemEvent('Deleting sub-assistants...'); // Log the deletion of sub-assistants
         await Promise.all(Object.entries(this.subAssistants).map(([name, assistant]) => this.deleteAssistant(assistant.assistantId, name))); // Delete all sub-assistants
         this.logSystemEvent('All assistants deleted'); // Log that all assistants are deleted
+
+        await this.deleteAllVectorStores();
     }
 
     // Method to delete a specific assistant
@@ -565,6 +640,23 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 }
+
+    async deleteAllVectorStores() {
+        this.logSystemEvent('Deleting all vector stores');
+        try {
+            const vectorStores = await this.client.beta.vectorStores.list();
+            for (const vectorStore of vectorStores.data) {
+                await this.client.beta.vectorStores.del(vectorStore.id);
+                this.logSystemEvent(`Deleted vector store: ${vectorStore.id}`);
+            }
+            this.vectorStores = {};
+            this.threadVectorStores = {};
+            this.logSystemEvent('All vector stores deleted');
+        } catch (error) {
+            this.logSystemEvent(`Error deleting vector stores: ${error.message}`);
+            throw error;
+        }
+    }
 
 // Method to log system events
 logSystemEvent(message) {

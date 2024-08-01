@@ -47,22 +47,24 @@ router.post('/start', async (req, res) => {
 
 router.post('/upload', upload.array('files'), async (req, res) => {
   try {
-    if (!req.files || req.files.length === 0) {
-      return res.status(400).json({ error: "No files uploaded" });
-    }
-    
-    const filePaths = req.files.map(file => {
-      const originalName = file.originalname;
-      const newPath = path.join(path.dirname(file.path), originalName);
-      fs.renameSync(file.path, newPath);
-      return newPath;
-    });
+      if (!req.files || req.files.length === 0) {
+          return res.status(400).json({ error: "No files uploaded" });
+      }
+      
+      const filePaths = req.files.map(file => {
+          const originalName = file.originalname;
+          const newPath = path.join(path.dirname(file.path), originalName);
+          fs.renameSync(file.path, newPath);
+          console.log(`File renamed: ${file.path} -> ${newPath}`);
+          return newPath;
+      });
 
-    const uploadedFiles = await chat.addFilesToConversation(filePaths);
-    res.json({ message: "Files uploaded successfully", files: uploadedFiles });
+      console.log(`Files to be uploaded: ${JSON.stringify(filePaths)}`);
+      const uploadedFiles = await chat.addFilesToConversation(filePaths);
+      res.json({ message: "Files uploaded successfully", files: uploadedFiles });
   } catch (error) {
-    console.error('Error uploading files:', error);
-    res.status(500).json({ error: "Failed to upload files", details: error.message });
+      console.error('Error uploading files:', error);
+      res.status(500).json({ error: "Failed to upload files", details: error.message });
   }
 });
 
