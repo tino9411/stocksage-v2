@@ -4,6 +4,28 @@ const Stock = require('../models/Stock');
 const { fetchHistoricalData } = require('./fetchHistoricalData');
 require('dotenv').config();
 
+// Minimum required data points for calculations
+const MIN_DATA_POINTS = 200;
+
+const calculateStandardDeviation = (values) => {
+    const avg = values.reduce((a, b) => a + b) / values.length;
+    const squareDiffs = values.map(value => Math.pow(value - avg, 2));
+    const avgSquareDiff = squareDiffs.reduce((a, b) => a + b) / squareDiffs.length;
+    return Math.sqrt(avgSquareDiff);
+  };
+  
+  // Dynamic threshold calculation based on recent volatility
+  const calculateDynamicThresholds = (data, period = 20) => {
+    const recentData = data.slice(0, period);
+    const volatility = calculateStandardDeviation(recentData.map(d => d.changePercent));
+    return {
+      rsiOverbought: 70 + volatility * 2,
+      rsiOversold: 30 - volatility * 2,
+      adxTrend: 25 + volatility * 5,
+      cciExtreme: 100 + volatility * 10
+    };
+  };
+
 
 const calculateSMA = (data, period) => {
     if (data.length < period) return null;
@@ -110,42 +132,58 @@ const calculateSMA = (data, period) => {
     };
   };
   
-const interpretIndicator = (indicator, value, data) => {
-  const lastPrice = data[data.length - 1].close;
-  switch (indicator) {
-    case 'SMA':
-    case 'EMA':
-      return lastPrice > value ? 'Buy' : lastPrice < value ? 'Sell' : 'Hold';
-    case 'BollingerBands':
-      return lastPrice > value.upper ? 'Sell' : lastPrice < value.lower ? 'Buy' : 'Hold';
-    case 'RSI':
-      return value > 70 ? 'Sell' : value < 30 ? 'Buy' : 'Hold';
-    case 'MACD':
-      return value.macd > value.signal ? 'Buy' : value.macd < value.signal ? 'Sell' : 'Hold';
-    case 'Stochastic':
-      return value.k > value.d && value.k < 20 ? 'Buy' : value.k < value.d && value.k > 80 ? 'Sell' : 'Hold';
-    case 'ADX':
-      return value.adx > 25 ? (value.pdi > value.mdi ? 'Buy' : 'Sell') : 'Hold';
-    case 'PSAR':
-      return lastPrice > value ? 'Buy' : 'Sell';
-    case 'CCI':
-      return value > 100 ? 'Sell' : value < -100 ? 'Buy' : 'Hold';
-    default:
-      return 'Hold';
-  }
-};
+  const interpretIndicator = (indicator, value, data, thresholds) => {
+    const lastPrice = data[0].close;
+    switch (indicator) {
+      case 'SMA':
+      case 'EMA':
+        return lastPrice > value ? 'Buy' : lastPrice < value ? 'Sell' : 'Hold';
+      case 'BollingerBands':
+        return lastPrice > value.upper ? 'Sell' : lastPrice < value.lower ? 'Buy' : 'Hold';
+      case 'RSI':
+        return value > thresholds.rsiOverbought ? 'Sell' : value < thresholds.rsiOversold ? 'Buy' : 'Hold';
+      case 'MACD':
+        return value.macd > value.signal ? 'Buy' : value.macd < value.signal ? 'Sell' : 'Hold';
+      case 'Stochastic':
+        return value.k > value.d && value.k < 20 ? 'Buy' : value.k < value.d && value.k > 80 ? 'Sell' : 'Hold';
+      case 'ADX':
+        return value.adx > thresholds.adxTrend ? (value.pdi > value.mdi ? 'Buy' : 'Sell') : 'Hold';
+      case 'PSAR':
+        return lastPrice > value ? 'Buy' : 'Sell';
+      case 'CCI':
+        return value > thresholds.cciExtreme ? 'Sell' : value < -thresholds.cciExtreme ? 'Buy' : 'Hold';
+      default:
+        return 'Hold';
+    }
+  };
 
-async function calculateTechnicalIndicators(symbol) {
-    await mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true, useUnifiedTopology: true });
+const validateIndicator = (name, value) => {
+    const ranges = {
+      SMA: [0, Infinity],
+      EMA: [0, Infinity],
+      RSI: [0, 100],
+      ADX: [0, 100],
+      CCI: [-Infinity, Infinity]
+    };
     
+    if (ranges[name]) {
+      const [min, max] = ranges[name];
+      return value >= min && value <= max;
+    }
+    return true; // For indicators without specific ranges
+  };
+
+  const calculateTechnicalIndicators = async (symbol) => {
     const historicalData = await fetchHistoricalData(symbol);
-    if (!historicalData || historicalData.length === 0) {
-      console.error(`No historical data found for symbol ${symbol}`);
+    
+    if (!historicalData || historicalData.length < MIN_DATA_POINTS) {
+      console.error(`Insufficient historical data for symbol ${symbol}. Minimum required: ${MIN_DATA_POINTS}, Received: ${historicalData.length}`);
       return null;
     }
   
+    const dynamicThresholds = calculateDynamicThresholds(historicalData);
     const closePrices = historicalData.map(item => item.close);
-  
+    
     const indicators = {
       SMA: {
         50: calculateSMA(closePrices, 50),
@@ -166,23 +204,30 @@ async function calculateTechnicalIndicators(symbol) {
       FibonacciLevels: calculateFibonacciLevels(historicalData)
     };
   
+    // Validate indicators
+    for (const [name, value] of Object.entries(indicators)) {
+      if (!validateIndicator(name, value)) {
+        console.warn(`Invalid ${name} value calculated: ${value}`);
+      }
+    }
+  
     const interpretations = {
       SMA: {
-        50: interpretIndicator('SMA', indicators.SMA[50], historicalData),
-        200: interpretIndicator('SMA', indicators.SMA[200], historicalData)
+        50: interpretIndicator('SMA', indicators.SMA[50], historicalData, dynamicThresholds),
+        200: interpretIndicator('SMA', indicators.SMA[200], historicalData, dynamicThresholds)
       },
       EMA: {
-        9: interpretIndicator('EMA', indicators.EMA[9], historicalData),
-        50: interpretIndicator('EMA', indicators.EMA[50], historicalData),
-        200: interpretIndicator('EMA', indicators.EMA[200], historicalData)
+        9: interpretIndicator('EMA', indicators.EMA[9], historicalData, dynamicThresholds),
+        50: interpretIndicator('EMA', indicators.EMA[50], historicalData, dynamicThresholds),
+        200: interpretIndicator('EMA', indicators.EMA[200], historicalData, dynamicThresholds)
       },
-      BollingerBands: interpretIndicator('BollingerBands', indicators.BollingerBands, historicalData),
-      RSI: interpretIndicator('RSI', indicators.RSI, historicalData),
-      MACD: interpretIndicator('MACD', indicators.MACD, historicalData),
-      Stochastic: interpretIndicator('Stochastic', indicators.Stochastic, historicalData),
-      ADX: interpretIndicator('ADX', indicators.ADX, historicalData),
-      PSAR: interpretIndicator('PSAR', indicators.PSAR, historicalData),
-      CCI: interpretIndicator('CCI', indicators.CCI, historicalData)
+      BollingerBands: interpretIndicator('BollingerBands', indicators.BollingerBands, historicalData, dynamicThresholds),
+      RSI: interpretIndicator('RSI', indicators.RSI, historicalData, dynamicThresholds),
+      MACD: interpretIndicator('MACD', indicators.MACD, historicalData, dynamicThresholds),
+      Stochastic: interpretIndicator('Stochastic', indicators.Stochastic, historicalData, dynamicThresholds),
+      ADX: interpretIndicator('ADX', indicators.ADX, historicalData, dynamicThresholds),
+      PSAR: interpretIndicator('PSAR', indicators.PSAR, historicalData, dynamicThresholds),
+      CCI: interpretIndicator('CCI', indicators.CCI, historicalData, dynamicThresholds)
     };
   
     const signalCount = {
@@ -201,38 +246,40 @@ async function calculateTechnicalIndicators(symbol) {
     const overallSignal = Object.keys(convergenceScore).reduce((a, b) => convergenceScore[a] > convergenceScore[b] ? a : b);
   
     return {
-      symbol,
-      lastPrice: historicalData[0].close,
-      indicators,
-      interpretations,
-      signalCount,
-      convergenceScore,
-      overallSignal,
-      analysis: `
-        Based on the analysis of multiple technical indicators:
-        
-        - ${signalCount.Buy} indicators suggest a Buy signal
-        - ${signalCount.Sell} indicators suggest a Sell signal
-        - ${signalCount.Hold} indicators suggest a Hold signal
-        
-        The convergence score shows:
-        - Buy: ${(convergenceScore.Buy * 100).toFixed(2)}%
-        - Sell: ${(convergenceScore.Sell * 100).toFixed(2)}%
-        - Hold: ${(convergenceScore.Hold * 100).toFixed(2)}%
-        
-        The overall signal based on indicator convergence is: ${overallSignal.toUpperCase()}
-        
-        Key observations:
-        - The stock is ${interpretations.SMA[200] === 'Buy' ? 'above' : 'below'} its 200-day SMA, indicating a ${interpretations.SMA[200] === 'Buy' ? 'bullish' : 'bearish'} long-term trend.
-        - RSI is at ${indicators.RSI.toFixed(2)}, suggesting the stock is ${indicators.RSI > 70 ? 'overbought' : indicators.RSI < 30 ? 'oversold' : 'neither overbought nor oversold'}.
-        - MACD ${indicators.MACD.macd > indicators.MACD.signal ? 'is above' : 'is below'} its signal line, indicating ${indicators.MACD.macd > indicators.MACD.signal ? 'bullish' : 'bearish'} momentum.
-        - The stock is ${interpretations.BollingerBands === 'Buy' ? 'near the lower' : interpretations.BollingerBands === 'Sell' ? 'near the upper' : 'within the'} Bollinger Bands, suggesting ${interpretations.BollingerBands === 'Hold' ? 'normal' : 'extreme'} price action.
-        
-        Please note that this analysis is based on historical data and technical indicators. It should not be considered as financial advice. Always conduct your own research and consider multiple factors before making investment decisions.
-      `
+        symbol,
+        /* lastPrice: historicalData[0].close, */
+        indicators,
+        /* interpretations, */
+        /* signalCount, */
+        /* convergenceScore, */
+       /*  overallSignal, */
+        /* analysis: `
+          Based on the analysis of multiple technical indicators using data from ${historicalData[historicalData.length - 1].date} to ${historicalData[0].date}:
+          
+          - ${signalCount.Buy} indicators suggest a Buy signal
+          - ${signalCount.Sell} indicators suggest a Sell signal
+          - ${signalCount.Hold} indicators suggest a Hold signal
+          
+          The convergence score shows:
+          - Buy: ${(convergenceScore.Buy * 100).toFixed(2)}%
+          - Sell: ${(convergenceScore.Sell * 100).toFixed(2)}%
+          - Hold: ${(convergenceScore.Hold * 100).toFixed(2)}%
+          
+          The overall signal based on indicator convergence is: ${overallSignal.toUpperCase()}
+          
+          Key observations:
+          - The stock is ${interpretations.SMA[200] === 'Buy' ? 'above' : 'below'} its 200-day SMA, indicating a ${interpretations.SMA[200] === 'Buy' ? 'bullish' : 'bearish'} long-term trend.
+          - RSI is at ${indicators.RSI.toFixed(2)}, suggesting the stock is ${indicators.RSI > dynamicThresholds.rsiOverbought ? 'overbought' : indicators.RSI < dynamicThresholds.rsiOversold ? 'oversold' : 'neither overbought nor oversold'}.
+          - MACD ${indicators.MACD.macd > indicators.MACD.signal ? 'is above' : 'is below'} its signal line, indicating ${indicators.MACD.macd > indicators.MACD.signal ? 'bullish' : 'bearish'} momentum.
+          - The stock is ${interpretations.BollingerBands === 'Buy' ? 'near the lower' : interpretations.BollingerBands === 'Sell' ? 'near the upper' : 'within the'} Bollinger Bands, suggesting ${interpretations.BollingerBands === 'Hold' ? 'normal' : 'extreme'} price action.
+          
+          Note: This analysis uses dynamic thresholds based on recent market volatility. The current RSI overbought/oversold thresholds are ${dynamicThresholds.rsiOverbought.toFixed(2)}/${dynamicThresholds.rsiOversold.toFixed(2)}.
+          
+          Please note that this analysis is based on historical data and technical indicators. It should not be considered as financial advice. Always conduct your own research and consider multiple factors before making investment decisions.
+        ` */
+      };
     };
-  }
-  
-  module.exports = {
-    calculateTechnicalIndicators
-  };
+    
+    module.exports = {
+        calculateTechnicalIndicators
+      };
