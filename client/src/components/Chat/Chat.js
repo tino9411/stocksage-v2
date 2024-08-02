@@ -14,9 +14,7 @@ function Chat() {
     isConversationStarted,
     startConversation,
     sendMessage,
-    logs,
     endChat,
-    toolCalls
   } = useChatState();
 
   const [error, setError] = useState(null);

@@ -424,7 +424,6 @@ class MainAssistantService extends BaseAssistantService {
         }
     }
 
-
     async enhanceResponseWithSubAssistantInfo(baseResponse, thread_id) {
         let enhancedResponse = baseResponse;
 

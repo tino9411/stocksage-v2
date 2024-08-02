@@ -117,20 +117,20 @@ class Chat extends EventEmitter {
   }
 
   async handleToolCalls(threadId, toolCalls, runId, onEvent) {
-    try {
-        const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
-            onEvent({ type: 'toolCallCreated', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments } } });
-            const result = await this.mainAssistant.executeToolCall(toolCall, threadId);
-            onEvent({ type: 'toolCallCompleted', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments }, output: result } });
-            return { tool_call_id: toolCall.id, output: JSON.stringify(result) };
-        }));
-        const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(threadId, runId, { tool_outputs: toolOutputs });
-        await this.observeStream(stream, onEvent);
-    } catch (error) {
-        console.error('[handleToolCalls] Error handling tool calls:', error);
-        onEvent({ type: 'error', data: error.message });
-    }
-}
+      try {
+          const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
+              onEvent({ type: 'toolCallCreated', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments } } });
+              const result = await this.mainAssistant.executeToolCall(toolCall);
+              onEvent({ type: 'toolCallCompleted', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments }, output: result } });
+              return { tool_call_id: toolCall.id, output: JSON.stringify(result) };
+          }));
+          const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(threadId, runId, { tool_outputs: toolOutputs });
+          await this.observeStream(stream, onEvent);
+      } catch (error) {
+          console.error('[handleToolCalls] Error handling tool calls:', error);
+          onEvent({ type: 'error', data: error.message });
+      }
+  }
 
   async uploadFile(filePath) {
     this.ensureInitialized();

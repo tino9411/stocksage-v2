@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import SendIcon from '@mui/icons-material/Send';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { useChatState } from '../../hooks/useChatState';
 import { InputArea, StyledTextField, StyledButton } from '../../styles/chatStyles';
-import { Popper, Paper, Typography, ClickAwayListener, IconButton } from '@mui/material';
+import { Popper, Paper, Typography, ClickAwayListener, IconButton, Box } from '@mui/material';
 import { styled } from '@mui/system';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
+import FilePreviewComponent from './FilePreviewComponent';
 
 const commands = [
   { command: '/analyse', description: 'Provide a comprehensive analysis of a stock' },
@@ -68,6 +69,7 @@ function InputAreaComponent() {
   const [showCommands, setShowCommands] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedFiles, setSelectedFiles] = useState([]);
   const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming, uploadFiles } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
@@ -97,32 +99,33 @@ function InputAreaComponent() {
   }, [selectedIndex]);
 
   const handleSendMessage = async () => {
-    if (input.trim() && !isStreaming) {
+    if ((input.trim() || selectedFiles.length > 0) && !isStreaming) {
       addLog(`User input: ${input}`);
       try {
         if (!isConversationStarted) {
           await startConversation(input);
         } else {
-          await sendMessage(input);
+          if (selectedFiles.length > 0) {
+            const fileIds = await uploadFiles(selectedFiles);
+            addLog(`Uploaded files: ${fileIds.join(', ')}`);
+          }
+          await sendMessage(input, selectedFiles.map(file => file.name));
         }
         setInput('');
+        setSelectedFiles([]);
       } catch (error) {
         addLog(`Error sending message: ${error.message}`);
       }
     }
   };
 
-  const handleFileUpload = async (event) => {
-    const files = Array.from(event.target.files);
-    if (files.length > 0) {
-      try {
-        const fileIds = await uploadFiles(files);
-        addLog(`Uploaded files: ${fileIds.join(', ')}`);
-        setInput((prevInput) => `${prevInput} (Uploaded files: ${files.map(f => f.name).join(', ')})`);
-      } catch (error) {
-        addLog(`Error uploading files: ${error.message}`);
-      }
-    }
+  const handleFileUpload = (event) => {
+    const newFiles = Array.from(event.target.files);
+    setSelectedFiles(prevFiles => [...prevFiles, ...newFiles]);
+  };
+
+  const removeFile = (index) => {
+    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
   };
 
 
@@ -171,76 +174,79 @@ function InputAreaComponent() {
   };
 
   return (
-    <ClickAwayListener onClickAway={() => setShowCommands(false)}>
-      <InputArea>
-        <div ref={popperAnchorRef} style={{ width: '100%', position: 'relative' }}>
-          <StyledTextField
-            fullWidth
-            variant="outlined"
-            placeholder="Type a message..."
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={!isInitialized || isStreaming}
-            multiline
-            minRows={1}
-            maxRows={4}
-            inputRef={inputRef}
-          />
-          <CommandPopper
-            open={showCommands}
-            anchorEl={popperAnchorRef.current}
-            placement="top-start"
-            modifiers={[
-              {
-                name: 'offset',
-                options: {
-                  offset: [0, 15],
+    <Box>
+      <FilePreviewComponent selectedFiles={selectedFiles} removeFile={removeFile} />
+      <ClickAwayListener onClickAway={() => setShowCommands(false)}>
+        <InputArea>
+          <div ref={popperAnchorRef} style={{ width: '100%', position: 'relative' }}>
+            <StyledTextField
+              fullWidth
+              variant="outlined"
+              placeholder="Type a message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              disabled={!isInitialized || isStreaming}
+              multiline
+              minRows={1}
+              maxRows={4}
+              inputRef={inputRef}
+            />
+            <CommandPopper
+              open={showCommands}
+              anchorEl={popperAnchorRef.current}
+              placement="top-start"
+              modifiers={[
+                {
+                  name: 'offset',
+                  options: {
+                    offset: [0, 15],
+                  },
                 },
-              },
-            ]}
+              ]}
+            >
+              <Paper elevation={0} ref={commandListRef}>
+                {filteredCommands.map((cmd, index) => (
+                  <CommandItem
+                    key={index}
+                    onClick={() => handleCommandSelect(cmd.command)}
+                    isSelected={index === selectedIndex}
+                  >
+                    <Typography variant="body2" style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
+                      {cmd.command}
+                    </Typography>
+                    <Typography variant="caption" color="textSecondary" style={{ fontSize: '0.75rem' }}>
+                      {cmd.description}
+                    </Typography>
+                  </CommandItem>
+                ))}
+              </Paper>
+            </CommandPopper>
+          </div>
+          <input
+            type="file"
+            multiple
+            style={{ display: 'none' }}
+            ref={fileInputRef}
+            onChange={handleFileUpload}
+          />
+          <IconButton
+            onClick={() => fileInputRef.current.click()}
+            disabled={!isInitialized || isStreaming}
+            style={{ marginRight: '8px' }}
           >
-            <Paper elevation={0} ref={commandListRef}>
-              {filteredCommands.map((cmd, index) => (
-                <CommandItem
-                  key={index}
-                  onClick={() => handleCommandSelect(cmd.command)}
-                  isSelected={index === selectedIndex}
-                >
-                  <Typography variant="body2" style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
-                    {cmd.command}
-                  </Typography>
-                  <Typography variant="caption" color="textSecondary" style={{ fontSize: '0.75rem' }}>
-                    {cmd.description}
-                  </Typography>
-                </CommandItem>
-              ))}
-            </Paper>
-          </CommandPopper>
-        </div>
-        <input
-          type="file"
-          multiple
-          style={{ display: 'none' }}
-          ref={fileInputRef}
-          onChange={handleFileUpload}
-        />
-        <IconButton
-          onClick={() => fileInputRef.current.click()}
-          disabled={!isInitialized || isStreaming}
-          style={{ marginRight: '8px' }}
-        >
-          <AttachFileIcon />
-        </IconButton>
-        <StyledButton
-          variant="contained"
-          onClick={handleSendMessage}
-          disabled={!isInitialized || isStreaming}
-        >
-          <SendIcon />
-        </StyledButton>
-      </InputArea>
-    </ClickAwayListener>
+            <AttachFileIcon />
+          </IconButton>
+          <StyledButton
+            variant="contained"
+            onClick={handleSendMessage}
+            disabled={!isInitialized || isStreaming}
+          >
+            <SendIcon />
+          </StyledButton>
+        </InputArea>
+      </ClickAwayListener>
+    </Box>
   );
 }
 
