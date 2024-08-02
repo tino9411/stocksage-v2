@@ -1,5 +1,5 @@
-import React from 'react';
-import { Box, Typography, IconButton } from '@mui/material';
+import React, { memo } from 'react';
+import { Box, Typography, IconButton, Tooltip } from '@mui/material';
 import { styled } from '@mui/system';
 import CloseIcon from '@mui/icons-material/Close';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
@@ -16,22 +16,37 @@ const FilePreviewContainer = styled(Box)(({ theme }) => ({
 }));
 
 const FilePreview = styled(Box)(({ theme }) => ({
+  position: 'relative',
   display: 'flex',
+  flexDirection: 'column',
   alignItems: 'center',
-  backgroundColor: 'rgba(255, 255, 255, 0.1)',
+  justifyContent: 'space-between',
+  backgroundColor: '#373944',
   borderRadius: '4px',
-  padding: theme.spacing(0.5, 1),
+  padding: theme.spacing(1),
+  width: '150px',
+  height: '80px',
 }));
 
-const FileIcon = styled(Box)(({ theme }) => ({
-  marginRight: theme.spacing(1),
+const FileIconWrapper = styled(Box)(({ theme }) => ({
   display: 'flex',
   alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%',
+  height: '40px',
 }));
+
+const FileNameWrapper = styled(Box)({
+  width: '100%',
+  textAlign: 'center',
+  overflow: 'wrap',
+});
 
 const RemoveFileButton = styled(IconButton)(({ theme }) => ({
+  position: 'absolute',
+  top: 0,
+  right: 0,
   padding: 2,
-  marginLeft: theme.spacing(1),
   '&:hover': {
     backgroundColor: 'rgba(255, 255, 255, 0.1)',
   },
@@ -49,22 +64,32 @@ const getFileIcon = (file) => {
   }
 };
 
-const FilePreviewComponent = ({ selectedFiles, removeFile }) => {
+const FilePreviewComponent = memo(({ selectedFiles, removeFile }) => {
   if (selectedFiles.length === 0) return null;
 
   return (
-    <FilePreviewContainer>
+    <FilePreviewContainer role="region" aria-label="Selected files">
       {selectedFiles.map((file, index) => (
         <FilePreview key={index}>
-          <FileIcon>{getFileIcon(file)}</FileIcon>
-          <Typography variant="caption">{file.name}</Typography>
-          <RemoveFileButton onClick={() => removeFile(index)} size="small">
+          <FileIconWrapper>{getFileIcon(file)}</FileIconWrapper>
+          <FileNameWrapper>
+            <Tooltip title={`${file.name} (${(file.size / 1024).toFixed(2)} KB)`}>
+              <Typography variant="caption" noWrap>
+                {file.name}
+              </Typography>
+            </Tooltip>
+          </FileNameWrapper>
+          <RemoveFileButton 
+            onClick={() => removeFile(index)} 
+            size="small"
+            aria-label={`Remove ${file.name}`}
+          >
             <CloseIcon fontSize="small" />
           </RemoveFileButton>
         </FilePreview>
       ))}
     </FilePreviewContainer>
   );
-};
+});
 
 export default FilePreviewComponent;

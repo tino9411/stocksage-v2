@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
+import ClearIcon from '@mui/icons-material/Clear';
 import { useChatState } from '../../hooks/useChatState';
 import { InputArea, StyledTextField, StyledButton } from '../../styles/chatStyles';
-import { Popper, Paper, Typography, ClickAwayListener, IconButton, Box } from '@mui/material';
+import { Popper, Paper, Typography, ClickAwayListener, IconButton, Box, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { styled } from '@mui/system';
 import FilePreviewComponent from './FilePreviewComponent';
+import { debounce } from 'lodash';
 
 const commands = [
   { command: '/analyse', description: 'Provide a comprehensive analysis of a stock' },
@@ -64,30 +66,41 @@ const CommandItem = styled('div')(({ theme, isSelected }) => ({
   },
 }));
 
+
 function InputAreaComponent() {
   const [input, setInput] = useState('');
   const [showCommands, setShowCommands] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming, uploadFiles } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
   const commandListRef = useRef(null);
   const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    if (input.startsWith('/')) {
+  const debouncedFilterCommands = useCallback(
+    debounce((inputValue) => {
       const filtered = commands.filter(cmd => 
-        cmd.command.toLowerCase().startsWith(input.toLowerCase())
+        cmd.command.toLowerCase().startsWith(inputValue.toLowerCase())
       );
       setFilteredCommands(filtered);
       setShowCommands(filtered.length > 0);
       setSelectedIndex(0);
+    }, 300),
+    []
+  );
+
+  useEffect(() => {
+    if (input.startsWith('/')) {
+      debouncedFilterCommands(input);
     } else {
       setShowCommands(false);
     }
-  }, [input]);
+  }, [input, debouncedFilterCommands]);
 
   useEffect(() => {
     if (commandListRef.current) {
@@ -98,23 +111,41 @@ function InputAreaComponent() {
     }
   }, [selectedIndex]);
 
+  useEffect(() => {
+    inputRef.current?.focus();
+  }, []);
+
   const handleSendMessage = async () => {
-    if ((input.trim() || selectedFiles.length > 0) && !isStreaming) {
-      addLog(`User input: ${input}`);
+    if ((input.trim() || selectedFiles.length > 0) && !isStreaming && !isLoading) {
+      setIsLoading(true);
       try {
-        if (!isConversationStarted) {
-          await startConversation(input);
-        } else {
-          if (selectedFiles.length > 0) {
-            const fileIds = await uploadFiles(selectedFiles);
-            addLog(`Uploaded files: ${fileIds.join(', ')}`);
+        if (selectedFiles.length > 0) {
+          const uploadResult = await uploadFiles(selectedFiles);
+          if (uploadResult.files && uploadResult.files.length > 0) {
+            addLog(`Uploaded files: ${uploadResult.files.map(file => file.name).join(', ')}`);
+            setSuccessMessage(uploadResult.message || `Successfully uploaded ${uploadResult.files.length} file(s)`);
+          } else {
+            addLog('No files were successfully uploaded');
+            setErrorMessage('Failed to upload files');
           }
-          await sendMessage(input, selectedFiles.map(file => file.name));
         }
-        setInput('');
+        
+        if (input.trim()) {
+          if (!isConversationStarted) {
+            await startConversation(input);
+          } else {
+            await sendMessage(input);
+          }
+          addLog(`User input: ${input}`);
+          setInput('');
+        }
+        
         setSelectedFiles([]);
       } catch (error) {
-        addLog(`Error sending message: ${error.message}`);
+        console.error('Error during file upload or message sending:', error);
+        setErrorMessage(`Error: ${error.message}`);
+      } finally {
+        setIsLoading(false);
       }
     }
   };
@@ -124,10 +155,9 @@ function InputAreaComponent() {
     setSelectedFiles(prevFiles => [...prevFiles, ...newFiles]);
   };
 
-  const removeFile = (index) => {
+  const removeFile = useCallback((index) => {
     setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
-  };
-
+  }, []);
 
   const handleKeyDown = (e) => {
     if (showCommands) {
@@ -170,12 +200,22 @@ function InputAreaComponent() {
   const handleCommandSelect = (command) => {
     setInput(command + ' ');
     setShowCommands(false);
-    inputRef.current.focus();
+    inputRef.current?.focus();
   };
+
+  const handleClearInput = () => {
+    setInput('');
+    setSelectedFiles([]);
+    inputRef.current?.focus();
+  };
+
+  const memoizedFilePreviewComponent = useMemo(() => (
+    <FilePreviewComponent selectedFiles={selectedFiles} removeFile={removeFile} />
+  ), [selectedFiles, removeFile]);
 
   return (
     <Box>
-      <FilePreviewComponent selectedFiles={selectedFiles} removeFile={removeFile} />
+      {memoizedFilePreviewComponent}
       <ClickAwayListener onClickAway={() => setShowCommands(false)}>
         <InputArea>
           <div ref={popperAnchorRef} style={{ width: '100%', position: 'relative' }}>
@@ -186,11 +226,22 @@ function InputAreaComponent() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!isInitialized || isStreaming}
+              disabled={!isInitialized || isStreaming || isLoading}
               multiline
               minRows={1}
               maxRows={4}
               inputRef={inputRef}
+              InputProps={{
+                endAdornment: (input || selectedFiles.length > 0) && (
+                  <IconButton
+                    onClick={handleClearInput}
+                    edge="end"
+                    aria-label="clear input and files"
+                  >
+                    <ClearIcon />
+                  </IconButton>
+                ),
+              }}
             />
             <CommandPopper
               open={showCommands}
@@ -204,6 +255,8 @@ function InputAreaComponent() {
                   },
                 },
               ]}
+              role="listbox"
+              aria-label="Command suggestions"
             >
               <Paper elevation={0} ref={commandListRef}>
                 {filteredCommands.map((cmd, index) => (
@@ -211,6 +264,8 @@ function InputAreaComponent() {
                     key={index}
                     onClick={() => handleCommandSelect(cmd.command)}
                     isSelected={index === selectedIndex}
+                    role="option"
+                    aria-selected={index === selectedIndex}
                   >
                     <Typography variant="body2" style={{ fontSize: '0.85rem', fontWeight: 'bold' }}>
                       {cmd.command}
@@ -229,25 +284,48 @@ function InputAreaComponent() {
             style={{ display: 'none' }}
             ref={fileInputRef}
             onChange={handleFileUpload}
+            aria-label="Upload files"
           />
           <IconButton
-            onClick={() => fileInputRef.current.click()}
-            disabled={!isInitialized || isStreaming}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={!isInitialized || isStreaming || isLoading}
             style={{ marginRight: '8px' }}
+            aria-label="Attach files"
           >
             <AttachFileIcon />
           </IconButton>
           <StyledButton
             variant="contained"
             onClick={handleSendMessage}
-            disabled={!isInitialized || isStreaming}
+            disabled={(!input.trim() && selectedFiles.length === 0) || !isInitialized || isStreaming || isLoading}
+            aria-label="Send message or upload files"
           >
-            <SendIcon />
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
           </StyledButton>
         </InputArea>
       </ClickAwayListener>
-    </Box>
-  );
-}
-
-export default InputAreaComponent;
+          <Snackbar 
+          open={!!errorMessage} 
+          autoHideDuration={6000} 
+          onClose={() => setErrorMessage('')}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setErrorMessage('')} severity="error" sx={{ width: '100%' }}>
+            {errorMessage}
+          </Alert>
+        </Snackbar>
+        <Snackbar 
+          open={!!successMessage} 
+          autoHideDuration={3000} 
+          onClose={() => setSuccessMessage('')}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+        >
+          <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+            {successMessage}
+          </Alert>
+        </Snackbar>
+      </Box>
+    );
+  }
+  
+  export default InputAreaComponent;

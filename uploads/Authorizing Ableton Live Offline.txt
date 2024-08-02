@@ -1,0 +1,16 @@
+Instructions for Offline Authorization
+--------------------------------------
+
+To authorize Live offline you will need:
+
+- A USB stick or external hard drive
+
+- A different computer that has an internet connection
+
+- Your Ableton serial number (if it hasn’t been registered to your ableton.com account yet)
+
+- Your hardware code: 223E-8B9C-20F1-63D3-F600-C769
+
+Go to this page on a separate internet-connected computer to download an authorization file from your account: https://www.ableton.com/account/authorize/offline/ 
+
+You can then move that file to your offline computer using a USB stick or external hard drive. Launch the version of Live you want to authorize and then open the file to complete the authorization.

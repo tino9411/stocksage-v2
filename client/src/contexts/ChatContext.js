@@ -214,13 +214,34 @@ export const ChatProvider = ({ children }) => {
       });
       addLog('Files uploaded successfully');
       addServerLogs(response.data.logs);
-      return response.data.fileIds;
+
+      let filesWithSize = [];
+      if (response.data.files && response.data.files.length > 0) {
+        filesWithSize = response.data.files.map((file, index) => ({
+          ...file,
+          size: files[index].size // Use the original File object's size
+        }));
+        
+        setMessages(prev => [
+          ...prev,
+          {
+            id: Date.now(),
+            sender: 'user',
+            type: 'files',
+            files: filesWithSize
+          }
+        ]);
+      }
+
+      return { ...response.data, files: filesWithSize };
     } catch (error) {
       console.error('Error uploading files:', error);
       addLog('Error uploading files');
       throw error;
     }
-  }, [isInitialized, isConversationStarted, addLog, addServerLogs]);
+  }, [isInitialized, isConversationStarted, addLog, addServerLogs, setMessages]);
+
+
 
   const endChat = useCallback(async () => {
     try {
