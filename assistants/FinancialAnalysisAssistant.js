@@ -11,6 +11,14 @@ const {
     fetchHistoricalRating
 } = require('../tools/fetchValuationTools');
 
+const {
+    fetchPriceTarget,
+    fetchPriceTargetSummary,
+    fetchPriceTargetByAnalyst,
+    fetchPriceTargetByCompany,
+    fetchPriceTargetConsensus
+} = require('../tools/fetchPriceTargetTools');
+
 class FinancialAnalysisAssistant extends BaseAssistantService {
     constructor(apiKey) {
         super(apiKey);
@@ -36,7 +44,12 @@ class FinancialAnalysisAssistant extends BaseAssistantService {
             this.createAdvancedDCFTool(),
             this.createLeveredDCFTool(),
             this.createCompanyRatingTool(),
-            this.createHistoricalRatingTool()
+            this.createHistoricalRatingTool(),
+            this.createPriceTargetTool(),
+            this.createPriceTargetSummaryTool(),
+            this.createPriceTargetByAnalystTool(),
+            this.createPriceTargetByCompanyTool(),
+            this.createPriceTargetConsensusTool()
         ];
 
         const newAssistant = await this.createAssistant({
@@ -197,6 +210,108 @@ class FinancialAnalysisAssistant extends BaseAssistantService {
         };
     }
 
+    
+
+    createPriceTargetTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchPriceTarget",
+                description: "Fetch the price target for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol of the company"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+    }
+
+    createPriceTargetSummaryTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchPriceTargetSummary",
+                description: "Fetch a summary of price targets for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol of the company"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+    }
+
+    createPriceTargetByAnalystTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchPriceTargetByAnalyst",
+                description: "Fetch price targets from a specific analyst",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        name: {
+                            type: "string",
+                            description: "The name of the analyst"
+                        }
+                    },
+                    required: ["name"]
+                }
+            }
+        };
+    }
+
+    createPriceTargetByCompanyTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchPriceTargetByCompany",
+                description: "Fetch price targets from a specific company",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        company: {
+                            type: "string",
+                            description: "The name of the company"
+                        }
+                    },
+                    required: ["company"]
+                }
+            }
+        };
+    }
+
+    createPriceTargetConsensusTool() {
+        return {
+            type: "function",
+            function: {
+                name: "fetchPriceTargetConsensus",
+                description: "Fetch the consensus price target for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol of the company"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+    }
+
     async handleRequiresAction(thread_id, run) {
         console.log('Handling required action in FinancialAnalysisAssistant...');
         if (
@@ -230,6 +345,21 @@ class FinancialAnalysisAssistant extends BaseAssistantService {
                             break;
                         case 'fetchHistoricalRating':
                             result = await fetchHistoricalRating(parsedArgs.symbol, parsedArgs.limit);
+                            break;
+                        case 'fetchPriceTarget':
+                            result = await fetchPriceTarget(parsedArgs.symbol);
+                            break;
+                        case 'fetchPriceTargetSummary':
+                            result = await fetchPriceTargetSummary(parsedArgs.symbol);
+                            break;
+                        case 'fetchPriceTargetByAnalyst':
+                            result = await fetchPriceTargetByAnalyst(parsedArgs.name);
+                            break;
+                        case 'fetchPriceTargetByCompany':
+                            result = await fetchPriceTargetByCompany(parsedArgs.company);
+                            break;
+                        case 'fetchPriceTargetConsensus':
+                            result = await fetchPriceTargetConsensus(parsedArgs.symbol);
                             break;
                         default:
                             throw new Error(`Unknown function ${name}`);

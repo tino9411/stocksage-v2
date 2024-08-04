@@ -3,6 +3,11 @@ const BaseAssistantService = require('./BaseAssistantService');
 const { fetchCompanyProfile } = require('../tools/fetchCompanyProfile');
 const { fetchRealTimeQuote } = require('../tools/fetchRealTimeQuote');
 const { fetchInsiderTradesSearch } = require('../tools/fetchInsiderTradesSearch');
+const { 
+    fetchAnalystEstimates, 
+    fetchAnalystRecommendations, 
+    fetchUpgradesDowngrades 
+} = require('../tools/fetchAnalystInfoTools');
 
 class CompanyProfileAssistant extends BaseAssistantService {
     constructor(apiKey) {
@@ -17,10 +22,16 @@ class CompanyProfileAssistant extends BaseAssistantService {
         5. Key financial metrics (revenue, profit, market cap)
         6. Real-time stock quotes
         7. Insider trading information
+        8. Analyst estimates
+        9. Analyst recommendations
+        10. Recent upgrades and downgrades
         
         Use the fetchCompanyProfile function to retrieve the most up-to-date information about a company.
         Use the fetchRealTimeQuote function to get the current stock price and related information.
         Use the fetchInsiderTradesSearch function to get insider trading information for a company.
+        Use the fetchAnalystEstimates function to get analyst estimates for a company.
+        Use the fetchAnalystRecommendations function to get analyst recommendations for a company.
+        Use the fetchUpgradesDowngrades function to get recent upgrades and downgrades for a company.
         If the information is not available or there's an error, inform the user and provide any alternative information you can.
         Always provide concise but comprehensive information.`;
     }
@@ -84,11 +95,81 @@ class CompanyProfileAssistant extends BaseAssistantService {
             }
         };
 
+        const fetchAnalystEstimatesTool = {
+            type: "function",
+            function: {
+                name: "fetchAnalystEstimates",
+                description: "Fetch analyst estimates for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol"
+                        },
+                        period: {
+                            type: "string",
+                            description: "The period for estimates (annual or quarter)",
+                            enum: ["annual", "quarter"]
+                        },
+                        limit: {
+                            type: "number",
+                            description: "The number of estimates to retrieve"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+
+        const fetchAnalystRecommendationsTool = {
+            type: "function",
+            function: {
+                name: "fetchAnalystRecommendations",
+                description: "Fetch analyst recommendations for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+
+        const fetchUpgradesDowngradesTool = {
+            type: "function",
+            function: {
+                name: "fetchUpgradesDowngrades",
+                description: "Fetch recent upgrades and downgrades for a given stock symbol",
+                parameters: {
+                    type: "object",
+                    properties: {
+                        symbol: {
+                            type: "string",
+                            description: "The stock symbol"
+                        }
+                    },
+                    required: ["symbol"]
+                }
+            }
+        };
+
         const newAssistant = await this.createAssistant({
             model,
             name,
             instructions: this.instructions,
-            tools: [fetchCompanyProfileTool, fetchRealTimeQuoteTool, fetchInsiderTradesSearchTool]
+            tools: [
+                fetchCompanyProfileTool, 
+                fetchRealTimeQuoteTool, 
+                fetchInsiderTradesSearchTool,
+                fetchAnalystEstimatesTool,
+                fetchAnalystRecommendationsTool,
+                fetchUpgradesDowngradesTool
+            ]
         });
         this.assistantId = newAssistant.id;
         console.log('Company Profile Assistant initialized:', newAssistant);
@@ -126,14 +207,27 @@ class CompanyProfileAssistant extends BaseAssistantService {
                 const parsedArgs = JSON.parse(args);
                 try {
                     let result;
-                    if (name === 'fetchCompanyProfile') {
-                        result = await fetchCompanyProfile(parsedArgs.symbol);
-                    } else if (name === 'fetchRealTimeQuote') {
-                        result = await fetchRealTimeQuote(parsedArgs.symbol);
-                    } else if (name === 'fetchInsiderTradesSearch') {
-                        result = await fetchInsiderTradesSearch(parsedArgs.symbol, parsedArgs.page || 0);
-                    } else {
-                        throw new Error(`Unknown function ${name}`);
+                    switch (name) {
+                        case 'fetchCompanyProfile':
+                            result = await fetchCompanyProfile(parsedArgs.symbol);
+                            break;
+                        case 'fetchRealTimeQuote':
+                            result = await fetchRealTimeQuote(parsedArgs.symbol);
+                            break;
+                        case 'fetchInsiderTradesSearch':
+                            result = await fetchInsiderTradesSearch(parsedArgs.symbol, parsedArgs.page || 0);
+                            break;
+                        case 'fetchAnalystEstimates':
+                            result = await fetchAnalystEstimates(parsedArgs.symbol, parsedArgs.period, parsedArgs.limit);
+                            break;
+                        case 'fetchAnalystRecommendations':
+                            result = await fetchAnalystRecommendations(parsedArgs.symbol);
+                            break;
+                        case 'fetchUpgradesDowngrades':
+                            result = await fetchUpgradesDowngrades(parsedArgs.symbol);
+                            break;
+                        default:
+                            throw new Error(`Unknown function ${name}`);
                     }
                     return {
                         tool_call_id: id,
