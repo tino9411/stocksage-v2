@@ -410,8 +410,12 @@ class MainAssistantService extends BaseAssistantService {
     async addFilesToConversation(filePaths) {
         try {
             const vectorStoreName = `ConversationStore_${this.currentThreadId}`;
-            const vectorStoreId = await this.uploadFilesAndCreateVectorStore(vectorStoreName, filePaths);
+            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
             
+            // Create vector store with the uploaded files
+            const vectorStoreId = await this.createVectorStore(vectorStoreName, uploadedFiles);
+            await this.attachVectorStoreToAssistant(vectorStoreId);
+    
             if (this.currentThreadId) {
                 await this.modifyThread(this.currentThreadId, {
                     tool_resources: {
@@ -424,9 +428,13 @@ class MainAssistantService extends BaseAssistantService {
             } else {
                 this.addSystemLog('Warning: No current thread ID available. Vector store created but not attached to any thread.');
             }
-
-            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
-            return uploadedFiles.map(file => ({ id: file.id, name: file.name }));
+    
+            // Return the uploaded files with their vector store ID
+            return uploadedFiles.map(file => ({ 
+                id: file.id, 
+                name: file.name, 
+                vectorStoreId: vectorStoreId 
+            }));
         } catch (error) {
             this.addSystemLog(`Error adding files to conversation: ${error.message}`);
             throw error;

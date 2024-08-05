@@ -368,6 +368,17 @@ class BaseAssistantService extends EventEmitter {
         }
     }
 
+    async deleteFile(fileId) {
+        try {
+            const response = await this.client.files.del(fileId);
+            this.addSystemLog(`Deleted file: ${fileId}`);
+            return response;
+        } catch (error) {
+            this.addSystemLog(`Error deleting file: ${error.message}`);
+            throw error;
+        }
+    }
+
     async createVectorStore(name, files) {
         this.addSystemLog(`Creating vector store: ${name}`);
         try {
@@ -426,13 +437,14 @@ class BaseAssistantService extends EventEmitter {
     }
 
     async addFilesToConversation(filePaths) {
-        this.addSystemLog(`Adding files to conversation: ${filePaths.join(', ')}`);
         try {
-            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
             const vectorStoreName = `ConversationStore_${this.currentThreadId}`;
+            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
+            
+            // Create vector store with the uploaded files
             const vectorStoreId = await this.createVectorStore(vectorStoreName, uploadedFiles);
             await this.attachVectorStoreToAssistant(vectorStoreId);
-
+    
             if (this.currentThreadId) {
                 await this.modifyThread(this.currentThreadId, {
                     tool_resources: {
@@ -445,14 +457,48 @@ class BaseAssistantService extends EventEmitter {
             } else {
                 this.addSystemLog('Warning: No current thread ID available. Vector store created but not attached to any thread.');
             }
-
-            return uploadedFiles.map(file => ({ id: file.id, name: file.name }));
+    
+            // Return the uploaded files with their vector store ID
+            return uploadedFiles.map(file => ({ 
+                id: file.id, 
+                name: file.name, 
+                vectorStoreId: vectorStoreId 
+            }));
         } catch (error) {
             this.addSystemLog(`Error adding files to conversation: ${error.message}`);
             throw error;
         }
     }
 
+    async deleteFileFromConversation(fileId, vectorStoreId) {
+        try {
+            // First, try to delete the file from the vector store
+            await this.deleteVectorStoreFile(vectorStoreId, fileId);
+            this.addSystemLog(`Deleted file ${fileId} from vector store ${vectorStoreId}`);
+
+            // Then, delete the file itself
+            await this.deleteFile(fileId);
+            this.addSystemLog(`Deleted file ${fileId}`);
+
+            return true;
+        } catch (error) {
+            this.addSystemLog(`Error deleting file from conversation: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async getVectorStoreIdForThread(threadId) {
+        try {
+            const thread = await this.retrieveThread(threadId);
+            if (thread.tool_resources && thread.tool_resources.file_search && thread.tool_resources.file_search.vector_store_ids) {
+                return thread.tool_resources.file_search.vector_store_ids[0];
+            }
+            return null;
+        } catch (error) {
+            this.addSystemLog(`Error getting vector store ID for thread: ${error.message}`);
+            throw error;
+        }
+    }
     async deleteAllVectorStores() {
         this.addSystemLog('Deleting all vector stores');
         try {
