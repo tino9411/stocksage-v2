@@ -9,7 +9,7 @@ const StyledMessageBubble = styled(Box)(({ theme, isuser }) => ({
   backgroundColor: isuser === 'true' ? '#5a8dee' : '#424557',
   borderRadius: '18px',
   padding: theme.spacing(1, 2),
-  maxWidth: '90%',
+  maxWidth: '100%',
   wordWrap: 'break-word',
   '& pre': {
     backgroundColor: '#2a2a2a',
