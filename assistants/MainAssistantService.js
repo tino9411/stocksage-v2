@@ -14,6 +14,7 @@ class MainAssistantService extends BaseAssistantService {
         this.assistantName = 'MainAssistant';
         this.subAssistants = {};
         this.subAssistantThreads = {};
+        this.threadVectorStores = {};
         this.instructions = this.getInstructions();
     }
 
@@ -409,14 +410,25 @@ class MainAssistantService extends BaseAssistantService {
 
     async addFilesToConversation(filePaths) {
         try {
-            const vectorStoreName = `ConversationStore_${this.currentThreadId}`;
-            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
-            
-            // Create vector store with the uploaded files
-            const vectorStoreId = await this.createVectorStore(vectorStoreName, uploadedFiles);
-            await this.attachVectorStoreToAssistant(vectorStoreId);
+            if (!this.currentThreadId) {
+                throw new Error('No current thread ID available.');
+            }
     
-            if (this.currentThreadId) {
+            // Check if a vector store already exists for this thread
+            let vectorStoreId = await this.getVectorStoreIdForThread(this.currentThreadId);
+            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
+    
+            if (vectorStoreId) {
+                // If a vector store exists, add the new files to it
+                this.addSystemLog(`Adding files to existing vector store ${vectorStoreId} for thread ${this.currentThreadId}`);
+                await this.addFilesToVectorStore(vectorStoreId, uploadedFiles);
+            } else {
+                // If no vector store exists, create a new one
+                const vectorStoreName = `ConversationStore_${this.currentThreadId}`;
+                vectorStoreId = await this.createVectorStore(vectorStoreName, uploadedFiles);
+                await this.attachVectorStoreToAssistant(vectorStoreId);
+    
+                // Attach the new vector store to the thread
                 await this.modifyThread(this.currentThreadId, {
                     tool_resources: {
                         file_search: {
@@ -424,10 +436,11 @@ class MainAssistantService extends BaseAssistantService {
                         }
                     }
                 });
-                this.addSystemLog(`Vector store ${vectorStoreId} attached to thread ${this.currentThreadId}`);
-            } else {
-                this.addSystemLog('Warning: No current thread ID available. Vector store created but not attached to any thread.');
+                this.addSystemLog(`Created and attached new vector store ${vectorStoreId} to thread ${this.currentThreadId}`);
             }
+    
+            // Store the vector store ID for this thread
+            this.threadVectorStores[this.currentThreadId] = vectorStoreId;
     
             // Return the uploaded files with their vector store ID
             return uploadedFiles.map(file => ({ 

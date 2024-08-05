@@ -499,6 +499,7 @@ class BaseAssistantService extends EventEmitter {
             throw error;
         }
     }
+
     async deleteAllVectorStores() {
         this.addSystemLog('Deleting all vector stores');
         try {

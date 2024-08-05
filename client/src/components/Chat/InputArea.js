@@ -72,11 +72,22 @@ function InputAreaComponent() {
   const [showCommands, setShowCommands] = useState(false);
   const [filteredCommands, setFilteredCommands] = useState([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [selectedFiles, setSelectedFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
-  const { sendMessage, isInitialized, addLog, isConversationStarted, startConversation, isStreaming, uploadFiles } = useChatState();
+  const { 
+    sendMessage, 
+    isInitialized, 
+    addLog, 
+    isConversationStarted, 
+    startConversation, 
+    isStreaming, 
+    uploadFile,
+    removeUploadedFile,
+    uploadingFiles,
+    uploadedFiles,
+    setUploadedFiles
+  } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
   const commandListRef = useRef(null);
@@ -116,33 +127,13 @@ function InputAreaComponent() {
   }, []);
 
   const handleSendMessage = async () => {
-    if ((input.trim() || selectedFiles.length > 0) && !isStreaming && !isLoading) {
+    if ((input.trim() || uploadedFiles.length > 0) && !isStreaming && !isLoading) {
       setIsLoading(true);
       try {
-        if (selectedFiles.length > 0) {
-          const uploadResult = await uploadFiles(selectedFiles);
-          if (uploadResult.files && uploadResult.files.length > 0) {
-            addLog(`Uploaded files: ${uploadResult.files.map(file => file.name).join(', ')}`);
-            setSuccessMessage(uploadResult.message || `Successfully uploaded ${uploadResult.files.length} file(s)`);
-          } else {
-            addLog('No files were successfully uploaded');
-            setErrorMessage('Failed to upload files');
-          }
-        }
-        
-        if (input.trim()) {
-          if (!isConversationStarted) {
-            await startConversation(input);
-          } else {
-            await sendMessage(input);
-          }
-          addLog(`User input: ${input}`);
-          setInput('');
-        }
-        
-        setSelectedFiles([]);
+        await sendMessage(input);
+        setInput('');
       } catch (error) {
-        console.error('Error during file upload or message sending:', error);
+        console.error('Error during message sending:', error);
         setErrorMessage(`Error: ${error.message}`);
       } finally {
         setIsLoading(false);
@@ -150,14 +141,32 @@ function InputAreaComponent() {
     }
   };
 
-  const handleFileUpload = (event) => {
+  const handleFileUpload = async (event) => {
     const newFiles = Array.from(event.target.files);
-    setSelectedFiles(prevFiles => [...prevFiles, ...newFiles]);
+    for (const file of newFiles) {
+      try {
+        await uploadFile(file);
+      } catch (error) {
+        setErrorMessage(`Failed to upload ${file.name}: ${error.message}`);
+      }
+    }
   };
 
-  const removeFile = useCallback((index) => {
-    setSelectedFiles(prevFiles => prevFiles.filter((_, i) => i !== index));
-  }, []);
+  const removeFile = useCallback((fileId) => {
+    if (!fileId) {
+      console.error('Invalid file ID');
+      setErrorMessage('Failed to remove file: Invalid file ID');
+      return;
+    }
+    removeUploadedFile(fileId)
+      .then(() => {
+        setSuccessMessage(`File removed successfully`);
+      })
+      .catch(error => {
+        console.error('Error removing file:', error);
+        setErrorMessage(`Failed to remove file: ${error.message}`);
+      });
+  }, [removeUploadedFile, setErrorMessage, setSuccessMessage]);
 
   const handleKeyDown = (e) => {
     if (showCommands) {
@@ -205,13 +214,17 @@ function InputAreaComponent() {
 
   const handleClearInput = () => {
     setInput('');
-    setSelectedFiles([]);
+    setUploadedFiles([]);
     inputRef.current?.focus();
   };
 
   const memoizedFilePreviewComponent = useMemo(() => (
-    <FilePreviewComponent selectedFiles={selectedFiles} removeFile={removeFile} />
-  ), [selectedFiles, removeFile]);
+    <FilePreviewComponent 
+      selectedFiles={uploadedFiles} 
+      removeFile={removeFile} 
+      uploadingFiles={uploadingFiles}
+    />
+  ), [uploadedFiles, removeFile, uploadingFiles]);
 
   return (
     <Box>
@@ -232,7 +245,7 @@ function InputAreaComponent() {
               maxRows={4}
               inputRef={inputRef}
               InputProps={{
-                endAdornment: (input || selectedFiles.length > 0) && (
+                endAdornment: (input || uploadedFiles.length > 0) && (
                   <IconButton
                     onClick={handleClearInput}
                     edge="end"
@@ -297,35 +310,35 @@ function InputAreaComponent() {
           <StyledButton
             variant="contained"
             onClick={handleSendMessage}
-            disabled={(!input.trim() && selectedFiles.length === 0) || !isInitialized || isStreaming || isLoading}
+            disabled={(!input.trim() && uploadedFiles.length === 0) || !isInitialized || isStreaming || isLoading}
             aria-label="Send message or upload files"
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
           </StyledButton>
         </InputArea>
       </ClickAwayListener>
-          <Snackbar 
-          open={!!errorMessage} 
-          autoHideDuration={6000} 
-          onClose={() => setErrorMessage('')}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert onClose={() => setErrorMessage('')} severity="error" sx={{ width: '100%' }}>
-            {errorMessage}
-          </Alert>
-        </Snackbar>
-        <Snackbar 
-          open={!!successMessage} 
-          autoHideDuration={3000} 
-          onClose={() => setSuccessMessage('')}
-          anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-        >
-          <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
-            {successMessage}
-          </Alert>
-        </Snackbar>
-      </Box>
-    );
-  }
-  
-  export default InputAreaComponent;
+      <Snackbar 
+        open={!!errorMessage} 
+        autoHideDuration={6000} 
+        onClose={() => setErrorMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setErrorMessage('')} severity="error" sx={{ width: '100%' }}>
+          {errorMessage}
+        </Alert>
+      </Snackbar>
+      <Snackbar 
+        open={!!successMessage} 
+        autoHideDuration={3000} 
+        onClose={() => setSuccessMessage('')}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSuccessMessage('')} severity="success" sx={{ width: '100%' }}>
+          {successMessage}
+        </Alert>
+      </Snackbar>
+    </Box>
+  );
+}
+
+export default InputAreaComponent;

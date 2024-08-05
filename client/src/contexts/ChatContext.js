@@ -15,6 +15,8 @@ export const ChatProvider = ({ children }) => {
   const [isToolCallInProgress, setIsToolCallInProgress] = useState(false);
   const [pendingToolCalls, setPendingToolCalls] = useState(0);
   const [isWaitingForToolCompletion, setIsWaitingForToolCompletion] = useState(false);
+  const [uploadingFiles, setUploadingFiles] = useState({});
+  const [uploadedFiles, setUploadedFiles] = useState([]);
 
   const addLog = useCallback(debounce((log) => {
     console.log(log);
@@ -40,8 +42,6 @@ export const ChatProvider = ({ children }) => {
       throw error;
     }
   }, [addLog, addServerLogs]);
-
-
   const startConversation = useCallback(async () => {
     if (isInitialized && !isConversationStarted) {
       try {
@@ -63,10 +63,24 @@ export const ChatProvider = ({ children }) => {
   }, [isInitialized, isConversationStarted, addLog, addServerLogs]);
 
   const sendMessage = useCallback(async (input) => {
-    if (input.trim() && isInitialized && isConversationStarted) {
-      const newUserMessage = { id: Date.now(), text: input, sender: 'user' };
-      const newAssistantMessage = { id: Date.now() + 1, text: '', sender: 'assistant', isStreaming: true };
-      setMessages(prev => [...prev, newUserMessage, newAssistantMessage]);
+    if ((input.trim() || uploadedFiles.length > 0) && isInitialized && isConversationStarted) {
+      if (uploadedFiles.length > 0) {
+        const fileMessage = {
+          id: Date.now(),
+          type: 'files',
+          files: uploadedFiles,
+          sender: 'user'
+        };
+        setMessages(prev => [...prev, fileMessage]);
+      }
+
+      if (input.trim()) {
+        const newUserMessage = { id: Date.now() + 1, text: input, sender: 'user' };
+        setMessages(prev => [...prev, newUserMessage]);
+      }
+
+      const newAssistantMessage = { id: Date.now() + 2, text: '', sender: 'assistant', isStreaming: true };
+      setMessages(prev => [...prev, newAssistantMessage]);
       addLog(`Sending message: ${input}`);
 
       try {
@@ -149,8 +163,10 @@ export const ChatProvider = ({ children }) => {
         setMessages(prev => [...prev, { id: Date.now(), text: "Sorry, there was an error processing your request.", sender: 'assistant' }]);
         handleStreamError();
       }
+      
+      setUploadedFiles([]); // Clear uploaded files after sending the message
     }
-  }, [isInitialized, isConversationStarted, addLog, pendingToolCalls]);
+  }, [isInitialized, isConversationStarted, addLog, pendingToolCalls, uploadedFiles]);
 
   const finalizeMessage = useCallback(() => {
     setMessages(prev => {
@@ -195,53 +211,66 @@ export const ChatProvider = ({ children }) => {
     setToolCalls([]);
   }, []);
 
-  const uploadFiles = useCallback(async (files) => {
+  const uploadFile = useCallback(async (file) => {
     if (!isInitialized || !isConversationStarted) {
       throw new Error('Assistant not initialized or conversation not started');
     }
   
     const formData = new FormData();
-    files.forEach((file, index) => {
-      formData.append(`files`, file);
-    });
+    formData.append('files', file);
   
     try {
-      addLog('Uploading files...');
+      setUploadingFiles(prev => ({ ...prev, [file.name]: true }));
+      addLog(`Uploading file: ${file.name}...`);
       const response = await axiosInstance.post('/api/chat/upload', formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
       });
-      addLog('Files uploaded successfully');
+      addLog(`File uploaded successfully: ${file.name}`);
       addServerLogs(response.data.logs);
 
-      let filesWithSize = [];
-      if (response.data.files && response.data.files.length > 0) {
-        filesWithSize = response.data.files.map((file, index) => ({
-          ...file,
-          size: files[index].size // Use the original File object's size
-        }));
-        
-        setMessages(prev => [
-          ...prev,
-          {
-            id: Date.now(),
-            sender: 'user',
-            type: 'files',
-            files: filesWithSize
-          }
-        ]);
-      }
+      const uploadedFile = {
+        ...response.data.files[0],
+        size: file.size
+      };
 
-      return { ...response.data, files: filesWithSize };
+      setUploadingFiles(prev => {
+        const newState = { ...prev };
+        delete newState[file.name];
+        return newState;
+      });
+
+      setUploadedFiles(prev => [...prev, uploadedFile]);
+
+      return uploadedFile;
     } catch (error) {
-      console.error('Error uploading files:', error);
-      addLog('Error uploading files');
+      console.error('Error uploading file:', error);
+      addLog(`Error uploading file: ${file.name}`);
+      setUploadingFiles(prev => {
+        const newState = { ...prev };
+        delete newState[file.name];
+        return newState;
+      });
       throw error;
     }
-  }, [isInitialized, isConversationStarted, addLog, addServerLogs, setMessages]);
+  }, [isInitialized, isConversationStarted, addLog, addServerLogs]);
 
-
+  const removeUploadedFile = useCallback(async (fileId) => {
+    try {
+      addLog(`Removing file: ${fileId}...`);
+      if (!fileId) {
+        throw new Error('Invalid file ID');
+      }
+      await axiosInstance.delete(`/api/chat/files/${fileId}`);
+      setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+      addLog(`File removed successfully: ${fileId}`);
+    } catch (error) {
+      console.error('Error removing file:', error);
+      addLog(`Error removing file: ${fileId}`);
+      throw error;
+    }
+  }, [addLog]);
 
   const endChat = useCallback(async () => {
     try {
@@ -283,18 +312,32 @@ export const ChatProvider = ({ children }) => {
     updateToolCallOutput,
     clearToolCalls,
     isWaitingForToolCompletion,
-    uploadFiles
-  }), [messages, 
-      isInitialized, 
-      isConversationStarted, 
-      initializeAssistant, 
-      startConversation, 
-      sendMessage, 
-      endChat, 
-      logs, 
-      addLog, 
-      isStreaming, 
-      isToolCallInProgress, toolCalls, updateToolCallOutput, clearToolCalls, isWaitingForToolCompletion, uploadFiles]);
+    uploadFile,
+    removeUploadedFile,
+    uploadingFiles,
+    uploadedFiles,
+    setUploadedFiles,
+  }), [
+    messages, 
+    isInitialized, 
+    isConversationStarted, 
+    initializeAssistant, 
+    startConversation, 
+    sendMessage, 
+    endChat, 
+    logs, 
+    addLog, 
+    isStreaming, 
+    isToolCallInProgress, 
+    toolCalls, 
+    updateToolCallOutput, 
+    clearToolCalls, 
+    isWaitingForToolCompletion, 
+    uploadFile, 
+    removeUploadedFile,
+    uploadingFiles,
+    uploadedFiles
+  ]);
 
   return (
     <ChatContext.Provider value={contextValue}>
