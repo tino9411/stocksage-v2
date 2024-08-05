@@ -68,6 +68,23 @@ router.post('/upload', upload.array('files'), async (req, res) => {
     }
 });
 
+router.delete('/files/:fileId', async (req, res) => {
+  try {
+      const { fileId } = req.params;
+      const vectorStoreId = await chat.mainAssistant.getVectorStoreIdForThread(chat.threadId);
+      
+      if (!vectorStoreId) {
+          throw new Error('No vector store found for this conversation');
+      }
+
+      await chat.mainAssistant.deleteFileFromConversation(fileId, vectorStoreId);
+      res.json({ message: "File removed successfully" });
+  } catch (error) {
+      console.error('Error removing file:', error);
+      res.status(error.status || 500).json({ error: "Failed to remove file", details: error.message });
+  }
+});
+
 
 router.post('/stream/message', (req, res) => {
   storedMessage = req.body.message;

@@ -156,6 +156,36 @@ class Chat extends EventEmitter {
         }
     }
 
+    async deleteFileFromConversation(fileId) {
+    this.ensureConversationStarted();
+    try {
+        const vectorStoreId = await this.mainAssistant.getVectorStoreIdForThread(this.threadId);
+        if (!vectorStoreId) {
+            throw new Error('No vector store found for this conversation');
+        }
+        
+        // Add a small delay to ensure the file is fully processed
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // First, try to delete the file from the vector store
+        try {
+            await this.mainAssistant.deleteVectorStoreFile(vectorStoreId, fileId);
+        } catch (error) {
+            if (error.status === 404) {
+                // If file not found in vector store, try deleting it directly
+                await this.mainAssistant.deleteFile(fileId);
+            } else {
+                throw error;
+            }
+        }
+
+        return { message: 'File deleted successfully', logs: this.mainAssistant.getAndClearSystemLogs() };
+    } catch (error) {
+        console.error('Failed to delete file from conversation:', error);
+        throw error;
+    }
+}
+
     async endConversation() {
         if (this.mainAssistant) {
             await this.mainAssistant.deleteAllAssistants();
