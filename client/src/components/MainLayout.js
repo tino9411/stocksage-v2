@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, styled } from '@mui/material';
 import WatchlistComponent from './Watchlist/Watchlist';
-import Chat from './Chat/Chat';
+import Chat from '../features/chat/components/Chat';
 import LoginButton from './LoginButton';
 import { useUser } from '../contexts/UserContext';
 

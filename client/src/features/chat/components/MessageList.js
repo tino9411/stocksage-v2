@@ -1,8 +1,8 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { List, ListItem, Box, Typography } from '@mui/material';
-import { useChatState } from '../../hooks/useChatState';
+import { useChatState } from '../../../features/chat';
 import MessageBubble from './MessageBubble';
-import { MessageList as StyledMessageList } from '../../styles/chatStyles';
+import { MessageList as StyledMessageList } from '../../../styles/chatStyles';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { styled } from '@mui/system';
 
@@ -46,9 +46,9 @@ function MessageList() {
 
   return (
     <StyledMessageList component={List}>
-      {messages.map((message) => (
-        <ListItem
-          key={message.id}
+      {messages.map((message, index) => (
+  <ListItem
+    key={message.id || index}
           style={{ justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start', flexDirection: 'column', alignItems: message.sender === 'user' ? 'flex-end' : 'flex-start' }}
         >
           {message.type === 'files' ? (

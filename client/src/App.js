@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
-import { ChatProvider } from './contexts/ChatContext';
+import { ChatProvider } from './features/chat';
 import { UserProvider } from './contexts/UserContext';
 import MainLayout from './components/MainLayout';
 import AuthCallback from './components/AuthCallback';

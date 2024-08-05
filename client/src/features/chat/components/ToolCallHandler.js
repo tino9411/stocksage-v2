@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Typography, LinearProgress } from '@mui/material';
-import { useChatState } from '../../hooks/useChatState';
+import { useChatState } from '../../../features/chat';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';
 

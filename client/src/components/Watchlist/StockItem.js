@@ -13,10 +13,10 @@ const StockItemContainer = styled(ListItem)(({ theme }) => ({
   paddingRight: theme.spacing(1),
 }));
 
-const StockIndicator = styled('div')(({ theme, positive }) => ({
+const StockIndicator = styled('div')(({ theme, $positive }) => ({
   width: '4px',
   height: '100%',
-  backgroundColor: positive === 'true' ? theme.palette.success.main : theme.palette.error.main,
+  backgroundColor: $positive ? theme.palette.success.main : theme.palette.error.main,
   marginRight: theme.spacing(2),
 }));
 
@@ -24,17 +24,17 @@ const StockSymbol = styled(Typography)({
   fontWeight: 'bold',
 });
 
-const StockPrice = styled(Typography)(({ theme, highlight }) => ({
+const StockPrice = styled(Typography)(({ theme, $highlight }) => ({
   fontWeight: 'bold',
   marginLeft: 'auto',
   transition: 'background-color 0.3s ease',
-  backgroundColor: highlight ? theme.palette.action.selected : 'transparent',
+  backgroundColor: $highlight ? theme.palette.action.selected : 'transparent',
   padding: theme.spacing(0.5),
   borderRadius: theme.shape.borderRadius,
 }));
 
-const StockChange = styled(Typography)(({ theme, positive }) => ({
-  color: positive === 'true' ? theme.palette.success.main : theme.palette.error.main,
+const StockChange = styled(Typography)(({ theme, $positive }) => ({
+  color: $positive ? theme.palette.success.main : theme.palette.error.main,
   marginLeft: theme.spacing(1),
 }));
 
@@ -76,18 +76,20 @@ const StockItem = ({ stock, removeFromWatchlist }) => {
     return 'N/A';
   };
 
+  const isPositive = stock.change >= 0;
+
   return (
     <StockItemContainer>
-      <StockIndicator positive={(stock.change >= 0).toString()} />
+      <StockIndicator $positive={isPositive} />
       <Box>
         <StockSymbol>{stock.symbol}</StockSymbol>
         <Typography variant="body2" color="textSecondary">{stock.companyName}</Typography>
       </Box>
       <Box sx={{ marginLeft: 'auto', textAlign: 'right', paddingRight: theme.spacing(4) }}>
-        <StockPrice highlight={highlight}>
+        <StockPrice $highlight={highlight}>
           {stock.price ? `$${stock.price.toFixed(2)}` : 'N/A'}
         </StockPrice>
-        <StockChange positive={(stock.change >= 0).toString()}>
+        <StockChange $positive={isPositive}>
           {getChangePercent()}
         </StockChange>
       </Box>

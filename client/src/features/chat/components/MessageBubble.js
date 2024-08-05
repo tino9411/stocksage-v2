@@ -6,10 +6,10 @@ import CopyButton from './CopyButton';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 
 const StyledMessageBubble = styled(Box)(({ theme, isuser }) => ({
-  backgroundColor: isuser ? '#5a8dee' : '#424557',
+  backgroundColor: isuser === 'true' ? '#5a8dee' : '#424557',
   borderRadius: '18px',
   padding: theme.spacing(1, 2),
-  maxWidth: '100%',
+  maxWidth: '90%',
   wordWrap: 'break-word',
   '& pre': {
     backgroundColor: '#2a2a2a',
@@ -117,9 +117,9 @@ function MessageBubble({ message }) {
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
-      <StyledMessageBubble isuser={message.sender === 'user'}>
-        {renderContent()}
-      </StyledMessageBubble>
+      <StyledMessageBubble isuser={message.sender === 'user' ? 'true' : 'false'}>
+  {renderContent()}
+</StyledMessageBubble>
       {showCopyButton && !message.isStreaming && (
         <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
           <CopyButton text={typeof message.text === 'string' ? message.text : JSON.stringify(message.content)} />
