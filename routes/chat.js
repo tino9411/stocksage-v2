@@ -24,7 +24,7 @@ router.post('/initialize', async (req, res) => {
     try {
         const logs = await chat.initializeAssistant({
             model: "gpt-4o-mini",
-            name: "Stock Analysis Assistant"
+            name: "Main Stock Analysis Assistant"
         });
         res.json({ message: "Assistant initialized successfully", logs });
     } catch (error) {
