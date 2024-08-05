@@ -32,7 +32,7 @@ export const ChatProvider = ({ children }) => {
   const initializeAssistant = useCallback(async () => {
     try {
       addLog('Initializing assistant...');
-      const response = await axiosInstance.post('/api/chat/initialize', {});
+      const response = await axiosInstance.post('/api/chat/initialize');
       setIsInitialized(true);
       addLog('Assistant initialized successfully');
       addServerLogs(response.data.logs);
@@ -42,18 +42,16 @@ export const ChatProvider = ({ children }) => {
       throw error;
     }
   }, [addLog, addServerLogs]);
+
   const startConversation = useCallback(async () => {
     if (isInitialized && !isConversationStarted) {
       try {
         addLog('Starting conversation...');
         const response = await axiosInstance.post('/api/chat/start', { message: "Start conversation" });
-        const data = response.data;
-        setMessages([
-          { text: data.message, sender: 'assistant' }
-        ]);
+        setMessages([{ text: response.data.message, sender: 'assistant' }]);
         setIsConversationStarted(true);
         addLog('Conversation started successfully');
-        addServerLogs(data.logs);
+        addServerLogs(response.data.logs);
       } catch (error) {
         console.error('Error starting conversation:', error);
         addLog('Error starting conversation');
@@ -64,23 +62,33 @@ export const ChatProvider = ({ children }) => {
 
   const sendMessage = useCallback(async (input) => {
     if ((input.trim() || uploadedFiles.length > 0) && isInitialized && isConversationStarted) {
+      const newMessages = [];
+
       if (uploadedFiles.length > 0) {
-        const fileMessage = {
+        newMessages.push({
           id: Date.now(),
           type: 'files',
           files: uploadedFiles,
           sender: 'user'
-        };
-        setMessages(prev => [...prev, fileMessage]);
+        });
       }
 
       if (input.trim()) {
-        const newUserMessage = { id: Date.now() + 1, text: input, sender: 'user' };
-        setMessages(prev => [...prev, newUserMessage]);
+        newMessages.push({
+          id: Date.now() + 1,
+          text: input,
+          sender: 'user'
+        });
       }
 
-      const newAssistantMessage = { id: Date.now() + 2, text: '', sender: 'assistant', isStreaming: true };
-      setMessages(prev => [...prev, newAssistantMessage]);
+      newMessages.push({
+        id: Date.now() + 2,
+        text: '',
+        sender: 'assistant',
+        isStreaming: true
+      });
+
+      setMessages(prev => [...prev, ...newMessages]);
       addLog(`Sending message: ${input}`);
 
       try {
@@ -122,14 +130,17 @@ export const ChatProvider = ({ children }) => {
           const data = JSON.parse(event.data);
           console.log('Tool call created:', data);
           addLog(`Tool call created: ${data.toolCall.function.name}`);
-          setToolCalls(prev => [...prev, { 
-            ...data.toolCall, 
-            function: {
-              ...data.toolCall.function,
-              arguments: JSON.stringify(data.toolCall.function.arguments)
-            },
-            output: null 
-          }]);
+          setToolCalls(prev => [
+            ...prev, 
+            { 
+              ...data.toolCall, 
+              function: {
+                ...data.toolCall.function,
+                arguments: JSON.stringify(data.toolCall.function.arguments)
+              },
+              output: null 
+            }
+          ]);
           setIsToolCallInProgress(true);
           setPendingToolCalls(prev => prev + 1);
         });
@@ -160,7 +171,10 @@ export const ChatProvider = ({ children }) => {
         };
       } catch (error) {
         console.error('Error sending message:', error);
-        setMessages(prev => [...prev, { id: Date.now(), text: "Sorry, there was an error processing your request.", sender: 'assistant' }]);
+        setMessages(prev => [
+          ...prev, 
+          { id: Date.now(), text: "Sorry, there was an error processing your request.", sender: 'assistant' }
+        ]);
         handleStreamError();
       }
       
