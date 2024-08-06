@@ -1,44 +1,17 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Box, Typography, IconButton, ListItem, Menu, MenuItem } from '@mui/material';
-import { styled, useTheme } from '@mui/system';
+import { Box, Typography, IconButton, Menu, MenuItem } from '@mui/material';
+import { useTheme } from '@mui/system';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import {
+  StyledStockItem,
+  StockIndicator,
+  StockSymbol,
+  StockPrice,
+  StockChange
+} from '../styles/StockItemStyles';
 
-const StockItemContainer = styled(ListItem)(({ theme }) => ({
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  '&:last-child': {
-    borderBottom: 'none',
-  },
-  padding: theme.spacing(1, 0),
-  position: 'relative',
-  paddingRight: theme.spacing(1),
-}));
 
-const StockIndicator = styled('div')(({ theme, $positive }) => ({
-  width: '4px',
-  height: '100%',
-  backgroundColor: $positive ? theme.palette.success.main : theme.palette.error.main,
-  marginRight: theme.spacing(2),
-}));
-
-const StockSymbol = styled(Typography)({
-  fontWeight: 'bold',
-});
-
-const StockPrice = styled(Typography)(({ theme, $highlight }) => ({
-  fontWeight: 'bold',
-  marginLeft: 'auto',
-  transition: 'background-color 0.3s ease',
-  backgroundColor: $highlight ? theme.palette.action.selected : 'transparent',
-  padding: theme.spacing(0.5),
-  borderRadius: theme.shape.borderRadius,
-}));
-
-const StockChange = styled(Typography)(({ theme, $positive }) => ({
-  color: $positive ? theme.palette.success.main : theme.palette.error.main,
-  marginLeft: theme.spacing(1),
-}));
-
-const StockItem = ({ stock, removeFromWatchlist }) => {
+const StockItem = ({ stock, onRemove }) => {
   const [anchorEl, setAnchorEl] = useState(null);
   const [highlight, setHighlight] = useState(false);
   const prevPrice = useRef(stock.price);
@@ -62,7 +35,7 @@ const StockItem = ({ stock, removeFromWatchlist }) => {
   };
 
   const handleDelete = () => {
-    removeFromWatchlist(stock.symbol);
+    onRemove();
     handleMenuClose();
   };
 
@@ -79,7 +52,7 @@ const StockItem = ({ stock, removeFromWatchlist }) => {
   const isPositive = stock.change >= 0;
 
   return (
-    <StockItemContainer>
+    <StyledStockItem>
       <StockIndicator $positive={isPositive} />
       <Box>
         <StockSymbol>{stock.symbol}</StockSymbol>
@@ -93,7 +66,7 @@ const StockItem = ({ stock, removeFromWatchlist }) => {
           {getChangePercent()}
         </StockChange>
       </Box>
-      <IconButton onClick={handleMenuOpen}>
+      <IconButton onClick={handleMenuOpen} size="small">
         <MoreVertIcon />
       </IconButton>
       <Menu
@@ -103,7 +76,7 @@ const StockItem = ({ stock, removeFromWatchlist }) => {
       >
         <MenuItem onClick={handleDelete}>Delete</MenuItem>
       </Menu>
-    </StockItemContainer>
+    </StyledStockItem>
   );
 };
 

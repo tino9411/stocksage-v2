@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, styled } from '@mui/material';
-import WatchlistComponent from './Watchlist/Watchlist';
+import { Watchlist } from '../features/watchlist';
 import Chat from '../features/chat/components/Chat';
 import LoginButton from './LoginButton';
 import { useUser } from '../contexts/UserContext';
@@ -29,30 +29,30 @@ const LoginContainer = styled(Box)({
 });
 
 function MainLayout() {
-  const { user, loading } = useUser();
-
-  if (loading) {
-    return <Box>Loading...</Box>;
-  }
-
-  if (!user) {
+    const { user, loading } = useUser();
+  
+    if (loading) {
+      return <Box>Loading...</Box>;
+    }
+  
+    if (!user) {
+      return (
+        <LoginContainer>
+          <LoginButton />
+        </LoginContainer>
+      );
+    }
+  
     return (
-      <LoginContainer>
-        <LoginButton />
-      </LoginContainer>
+      <LayoutContainer>
+        <WatchlistContainer>
+          <Watchlist />
+        </WatchlistContainer>
+        <ChatContainer>
+          <Chat />
+        </ChatContainer>
+      </LayoutContainer>
     );
   }
-
-  return (
-    <LayoutContainer>
-      <WatchlistContainer>
-        <WatchlistComponent />
-      </WatchlistContainer>
-      <ChatContainer>
-        <Chat />
-      </ChatContainer>
-    </LayoutContainer>
-  );
-}
-
-export default MainLayout;
+  
+  export default MainLayout;

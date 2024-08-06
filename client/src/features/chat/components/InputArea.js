@@ -3,7 +3,7 @@ import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ClearIcon from '@mui/icons-material/Clear';
 import { useChatState } from '../hooks/useChatState';
-import { InputArea, StyledTextField, StyledButton } from '../../../styles/chatStyles';
+import { InputArea, StyledTextField, StyledButton } from '../styles/chatStyles';
 import { Popper, Paper, Typography, ClickAwayListener, IconButton, Box, CircularProgress, Snackbar, Alert } from '@mui/material';
 import { styled } from '@mui/system';
 import FilePreviewComponent from './FilePreviewComponent';

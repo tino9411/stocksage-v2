@@ -4,7 +4,7 @@ import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
-import { ChatContainer, ChatBox } from '../../../styles/chatStyles';
+import { ChatContainer, ChatBox } from '../styles/chatStyles';
 import { Button, Typography, CircularProgress } from '@mui/material';
 
 function Chat() {

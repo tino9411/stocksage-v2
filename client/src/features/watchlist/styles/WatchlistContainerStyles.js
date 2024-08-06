@@ -1,7 +1,7 @@
-import { Box, Typography, CircularProgress } from '@mui/material';
 import { styled } from '@mui/system';
+import { Box } from '@mui/material';
 
-const WatchlistContainer = styled(Box)(({ theme }) => ({
+export const StyledWatchlistContainer = styled(Box)(({ theme }) => ({
   height: '100%',
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
@@ -9,5 +9,3 @@ const WatchlistContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
 }));
-
-export default WatchlistContainer;

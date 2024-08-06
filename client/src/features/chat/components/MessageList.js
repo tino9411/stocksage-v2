@@ -2,7 +2,7 @@ import React, { useRef, useEffect, useCallback } from 'react';
 import { List, ListItem, Box, Typography } from '@mui/material';
 import { useChatState } from '../../../features/chat';
 import MessageBubble from './MessageBubble';
-import { MessageList as StyledMessageList } from '../../../styles/chatStyles';
+import { MessageList as StyledMessageList } from '../styles/chatStyles';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import { styled } from '@mui/system';
 
