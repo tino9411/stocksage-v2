@@ -3,11 +3,12 @@ import { useUser } from '../../../contexts/UserContext';
 import { watchlistApi } from '../api/watchlistApi';
 
 export const useWatchlist = () => {
-  const { user } = useUser();
-  const [watchlist, setWatchlist] = useState([]);
-  const [filteredWatchlist, setFilteredWatchlist] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+    const { user } = useUser();
+    const [watchlist, setWatchlist] = useState([]);
+    const [filteredWatchlist, setFilteredWatchlist] = useState([]);
+    const [selectedStocks, setSelectedStocks] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTerm, setFilterTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
@@ -63,8 +64,20 @@ export const useWatchlist = () => {
   };
 
   const handleFilterChange = (event) => {
-    setFilterTerm(event.target.value);
+    const value = event.target.value;
+    setSelectedStocks(value);
   };
+
+  useEffect(() => {
+    if (selectedStocks.length === 0) {
+      setFilteredWatchlist(watchlist);
+    } else {
+      const filtered = watchlist.filter(stock => 
+        selectedStocks.includes(stock.symbol)
+      );
+      setFilteredWatchlist(filtered);
+    }
+  }, [selectedStocks, watchlist]);
 
   const addToWatchlist = async (symbol) => {
     if (!user) return;
@@ -97,6 +110,7 @@ export const useWatchlist = () => {
   return {
     watchlist,
     filteredWatchlist,
+    selectedStocks,
     loading,
     error,
     searchTerm,

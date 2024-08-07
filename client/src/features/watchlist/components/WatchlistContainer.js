@@ -10,11 +10,12 @@ import { useUser } from '../../../contexts/UserContext';
 function WatchlistContainer() {
   const { user } = useUser();
   const {
+    watchlist,
     filteredWatchlist,
+    selectedStocks,
     loading,
     error,
     searchTerm,
-    filterTerm,
     searchResults,
     handleSearchChange,
     handleFilterChange,
@@ -57,7 +58,8 @@ function WatchlistContainer() {
         error={error}
       />
       <WatchlistFilter
-        filterTerm={filterTerm}
+        stocks={watchlist}
+        selectedStocks={selectedStocks}
         handleFilterChange={handleFilterChange}
       />
       <StockList

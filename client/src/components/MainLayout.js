@@ -1,9 +1,9 @@
-import React from 'react';
-import { Box, styled } from '@mui/material';
+import React, { useEffect } from 'react';
+import { Box, styled, CircularProgress } from '@mui/material';
 import { Watchlist } from '../features/watchlist';
 import Chat from '../features/chat/components/Chat';
-import LoginButton from './LoginButton';
 import { useUser } from '../contexts/UserContext';
+import { useNavigate } from 'react-router-dom';
 
 const LayoutContainer = styled(Box)({
   display: 'flex',
@@ -21,38 +21,45 @@ const ChatContainer = styled(Box)({
   overflow: 'auto',
 });
 
-const LoginContainer = styled(Box)({
+const LoadingContainer = styled(Box)({
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
-  height: '100%',
+  height: '100vh',
 });
 
 function MainLayout() {
-    const { user, loading } = useUser();
-  
-    if (loading) {
-      return <Box>Loading...</Box>;
+  const { user, loading } = useUser();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      navigate('/login');
     }
-  
-    if (!user) {
-      return (
-        <LoginContainer>
-          <LoginButton />
-        </LoginContainer>
-      );
-    }
-  
+  }, [user, loading, navigate]);
+
+  if (loading) {
     return (
-      <LayoutContainer>
-        <WatchlistContainer>
-          <Watchlist />
-        </WatchlistContainer>
-        <ChatContainer>
-          <Chat />
-        </ChatContainer>
-      </LayoutContainer>
+      <LoadingContainer>
+        <CircularProgress />
+      </LoadingContainer>
     );
   }
-  
-  export default MainLayout;
+
+  if (!user) {
+    return null; // This will prevent any flash of content before redirecting
+  }
+
+  return (
+    <LayoutContainer>
+      <WatchlistContainer>
+        <Watchlist />
+      </WatchlistContainer>
+      <ChatContainer>
+        <Chat />
+      </ChatContainer>
+    </LayoutContainer>
+  );
+}
+
+export default MainLayout;
