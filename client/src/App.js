@@ -3,10 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { ChatProvider } from './features/chat';
 import { UserProvider } from './contexts/UserContext';
-import MainLayout from './components/MainLayout';
-import AuthCallback from './components/AuthCallback';
-import LoginPage from './components/LoginPage';
+import MainLayout from './layouts/MainLayout';
+import { AuthCallback } from './features/auth';
+import LoginPage from './pages/LoginPage';
 import { useUser } from './contexts/UserContext';
+import LoadingSpinner from './components/ui/LoadingSpinner';
 
 const darkTheme = createTheme({
   palette: {
@@ -17,15 +18,15 @@ const darkTheme = createTheme({
 // Route guard component
 const PrivateRoute = ({ children }) => {
   const { user, loading } = useUser();
-
+  
   if (loading) {
-    return <div>Loading...</div>;
+    return <LoadingSpinner />;
   }
-
+  
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-
+  
   return children;
 };
 

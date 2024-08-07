@@ -1,8 +1,8 @@
-import React, { useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUser } from '../contexts/UserContext';
+import { useUser } from '../../../contexts/UserContext';
 
-const AuthCallback = () => {
+export const useAuthCallback = () => {
   const navigate = useNavigate();
   const { fetchUser } = useUser();
 
@@ -19,8 +19,4 @@ const AuthCallback = () => {
 
     handleAuthCallback();
   }, [fetchUser, navigate]);
-
-  return <div>Authenticating...</div>;
 };
-
-export default AuthCallback;
