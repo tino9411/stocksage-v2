@@ -14,18 +14,18 @@ class Chat extends EventEmitter {
 
     async createThread() {
         try {
-          const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
-          if (!mainAssistant) {
-            throw new Error('Main assistant not found in database');
-          }
-    
-          const thread = await this.client.beta.threads.create();
-          return thread.id;
+            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
+            if (!mainAssistant) {
+                throw new Error('Main assistant not found in database');
+            }
+
+            const thread = await this.client.beta.threads.create();
+            return thread.id;
         } catch (error) {
-          console.error('Failed to create thread:', error);
-          throw error;
+            console.error('Failed to create thread:', error);
+            throw error;
         }
-      }
+    }
 
     async addFilesToAssistant(files) {
         try {
@@ -39,21 +39,23 @@ class Chat extends EventEmitter {
         }
     }
 
-
     async sendMessage(threadId, userMessage) {
-        if (!this.isInitialized) {
-            throw new Error('Assistant not initialized. Please call initializeAssistant first.');
-        }
-        const thread = this.threads.get(threadId);
-        if (!thread) {
-            throw new Error('Thread not found');
-        }
         try {
-            const response = await this.mainAssistant.chatWithAssistant(threadId, this.mainAssistant.assistantId, userMessage);
-            return {
-                message: response,
-                logs: this.mainAssistant.getAndClearSystemLogs()
-            };
+            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
+            if (!mainAssistant) {
+                throw new Error('Main assistant not found in database');
+            }
+
+            await this.client.beta.threads.messages.create(threadId, {
+                role: 'user',
+                content: userMessage
+            });
+
+            const run = await this.client.beta.threads.runs.create(threadId, {
+                assistant_id: mainAssistant.assistantId,
+            });
+
+            return { message: "Message sent successfully", runId: run.id };
         } catch (error) {
             console.error('Failed to send message:', error);
             throw error;
@@ -61,17 +63,22 @@ class Chat extends EventEmitter {
     }
 
     async streamMessage(threadId, userMessage, onEvent) {
-        if (!this.isInitialized) {
-            throw new Error('Assistant not initialized. Please call initializeAssistant first.');
-        }
-        const thread = this.threads.get(threadId);
-        if (!thread) {
-            throw new Error('Thread not found');
-        }
         try {
-            await this.mainAssistant.createMessage(threadId, { role: 'user', content: userMessage });
-            const { assistantId } = this.mainAssistant;
-            const stream = await this.mainAssistant.client.beta.threads.runs.createAndStream(threadId, { assistant_id: assistantId });
+            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
+            if (!mainAssistant) {
+                throw new Error('Main assistant not found in database');
+            }
+
+            await this.client.beta.threads.messages.create(threadId, {
+                role: 'user',
+                content: userMessage
+            });
+
+            const stream = await this.client.beta.threads.runs.createAndStream(
+                threadId,
+                { assistant_id: mainAssistant.assistantId }
+            );
+
             await this.observeStream(stream, onEvent);
             const finalMessages = await stream.finalMessages();
             console.log('[streamMessage] Final messages:', finalMessages);
@@ -103,11 +110,11 @@ class Chat extends EventEmitter {
         try {
             const toolOutputs = await Promise.all(toolCalls.map(async (toolCall) => {
                 onEvent({ type: 'toolCallCreated', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments } } });
-                const result = await this.mainAssistant.executeToolCall(toolCall);
+                const result = await this.executeToolCall(toolCall);
                 onEvent({ type: 'toolCallCompleted', data: { id: toolCall.id, function: { name: toolCall.function.name, arguments: toolCall.function.arguments }, output: result } });
                 return { tool_call_id: toolCall.id, output: JSON.stringify(result) };
             }));
-            const stream = await this.mainAssistant.client.beta.threads.runs.submitToolOutputsStream(threadId, runId, { tool_outputs: toolOutputs });
+            const stream = await this.client.beta.threads.runs.submitToolOutputsStream(threadId, runId, { tool_outputs: toolOutputs });
             await this.observeStream(stream, onEvent);
         } catch (error) {
             console.error('[handleToolCalls] Error handling tool calls:', error);
@@ -116,16 +123,20 @@ class Chat extends EventEmitter {
     }
 
     async addFilesToConversation(threadId, files) {
-        if (!this.isInitialized) {
-            throw new Error('Assistant not initialized. Please call initializeAssistant first.');
-        }
-        const thread = this.threads.get(threadId);
-        if (!thread) {
-            throw new Error('Thread not found');
-        }
         try {
-            const uploadedFiles = await this.mainAssistant.addFilesToConversation(files);
-            return uploadedFiles;
+            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
+            if (!mainAssistant) {
+                throw new Error('Main assistant not found in database');
+            }
+
+            const formData = new FormData();
+            files.forEach(file => {
+                formData.append('files', fs.createReadStream(file), path.basename(file));
+            });
+            formData.append('threadId', threadId);
+
+            const response = await this.client.beta.threads.files.addFiles(threadId, formData);
+            return response.data;
         } catch (error) {
             console.error('Failed to add files to conversation:', error);
             throw error;
@@ -133,35 +144,9 @@ class Chat extends EventEmitter {
     }
 
     async deleteFileFromConversation(threadId, fileId) {
-        if (!this.isInitialized) {
-            throw new Error('Assistant not initialized. Please call initializeAssistant first.');
-        }
-        const thread = this.threads.get(threadId);
-        if (!thread) {
-            throw new Error('Thread not found');
-        }
         try {
-            const vectorStoreId = await this.mainAssistant.getVectorStoreIdForThread(threadId);
-            if (!vectorStoreId) {
-                throw new Error('No vector store found for this conversation');
-            }
-            
-            // Add a small delay to ensure the file is fully processed
-            await new Promise(resolve => setTimeout(resolve, 2000));
-
-            // First, try to delete the file from the vector store
-            try {
-                await this.mainAssistant.deleteVectorStoreFile(vectorStoreId, fileId);
-            } catch (error) {
-                if (error.status === 404) {
-                    // If file not found in vector store, try deleting it directly
-                    await this.mainAssistant.deleteFile(fileId);
-                } else {
-                    throw error;
-                }
-            }
-
-            return { message: 'File deleted successfully', logs: this.mainAssistant.getAndClearSystemLogs() };
+            await this.client.beta.threads.files.deleteFile(threadId, fileId);
+            return { message: 'File deleted successfully' };
         } catch (error) {
             console.error('Failed to delete file from conversation:', error);
             throw error;
@@ -169,35 +154,13 @@ class Chat extends EventEmitter {
     }
 
     async endConversation(threadId) {
-        if (!this.isInitialized) {
-            throw new Error('Assistant not initialized. Please call initializeAssistant first.');
-        }
-        const thread = this.threads.get(threadId);
-        if (!thread) {
-            throw new Error('Thread not found');
-        }
         try {
-            await this.mainAssistant.deleteThread(threadId);
-            this.threads.delete(threadId);
-            return this.mainAssistant.getAndClearSystemLogs();
+            await this.client.beta.threads.del(threadId);
+            return { message: 'Conversation ended successfully' };
         } catch (error) {
             console.error('Failed to end conversation:', error);
             throw error;
         }
-    }
-
-    async shutDown() {
-        if (this.mainAssistant) {
-            await this.mainAssistant.deleteAllAssistants();
-            this.resetState();
-        }
-        return this.mainAssistant ? this.mainAssistant.getAndClearSystemLogs() : [];
-    }
-
-    resetState() {
-        this.mainAssistant = null;
-        this.threads.clear();
-        this.isInitialized = false;
     }
 }
 

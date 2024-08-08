@@ -1,9 +1,11 @@
+// client/src/features/chat/hooks/useMessageSending.js
+
 import { useCallback } from 'react';
 import * as chatApi from '../api/chatApi';
 
 export const useMessageSending = (
-  isInitialized,
-  isConversationStarted,
+  isThreadCreated,
+  currentThreadId,
   uploadedFiles,
   addLog,
   setIsStreaming,
@@ -18,7 +20,7 @@ export const useMessageSending = (
   setupEventSource
 ) => {
   const sendMessage = useCallback(async (input) => {
-    if ((input.trim() || uploadedFiles.length > 0) && isInitialized && isConversationStarted) {
+    if ((input.trim() || uploadedFiles.length > 0) && isThreadCreated && currentThreadId) {
       const newMessages = [];
 
       if (uploadedFiles.length > 0) {
@@ -56,7 +58,7 @@ export const useMessageSending = (
         setIsWaitingForToolCompletion(false);
 
         console.log('Sending message to API:', input);
-        const response = await chatApi.sendMessage(input);
+        const response = await chatApi.sendMessage(currentThreadId, input);
         console.log('API response:', response);
 
         if (!response) {
@@ -80,7 +82,7 @@ export const useMessageSending = (
       
       setUploadedFiles([]);
     }
-  }, [isInitialized, isConversationStarted, uploadedFiles, addLog, setIsStreaming, setToolCalls, setIsToolCallInProgress, setPendingToolCalls, setIsWaitingForToolCompletion, finalizeMessage, handleStreamError, setMessages, setUploadedFiles, setupEventSource]);
+  }, [isThreadCreated, currentThreadId, uploadedFiles, addLog, setIsStreaming, setToolCalls, setIsToolCallInProgress, setPendingToolCalls, setIsWaitingForToolCompletion, finalizeMessage, handleStreamError, setMessages, setUploadedFiles, setupEventSource]);
 
   return { sendMessage };
 };

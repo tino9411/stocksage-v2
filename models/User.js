@@ -1,3 +1,5 @@
+// models/User.js
+
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
@@ -17,6 +19,10 @@ const UserSchema = new mongoose.Schema({
   },
   watchlist: [{
     type: String
+  }],
+  threads: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Thread'
   }]
 }, { timestamps: true });
 

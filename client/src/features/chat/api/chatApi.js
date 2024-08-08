@@ -13,7 +13,7 @@ export const createThread = () =>
   axiosInstance.post('/api/chat/create-thread').then(handleResponse);
 
 export const sendMessage = (threadId, message) => 
-  axiosInstance.post('/api/chat/send-message', { threadId, message }).then(handleResponse);
+  axiosInstance.post('/api/chat/stream/message', { threadId, message }).then(handleResponse);
 
 export const uploadFile = (formData) => 
   axiosInstance.post('/api/chat/upload', formData, {

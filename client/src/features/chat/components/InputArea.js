@@ -1,3 +1,5 @@
+// client/src/features/chat/components/InputArea.js
+
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -66,7 +68,6 @@ const CommandItem = styled('div')(({ theme, isSelected }) => ({
   },
 }));
 
-
 function InputAreaComponent() {
   const [input, setInput] = useState('');
   const [showCommands, setShowCommands] = useState(false);
@@ -77,10 +78,8 @@ function InputAreaComponent() {
   const [successMessage, setSuccessMessage] = useState('');
   const { 
     sendMessage, 
-    isInitialized, 
+    isThreadCreated, 
     addLog, 
-    isConversationStarted, 
-    startConversation, 
     isStreaming, 
     uploadFile,
     removeUploadedFile,
@@ -239,7 +238,7 @@ function InputAreaComponent() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!isInitialized || isStreaming || isLoading}
+              disabled={!isThreadCreated || isStreaming || isLoading}
               multiline
               minRows={1}
               maxRows={4}
@@ -301,7 +300,7 @@ function InputAreaComponent() {
           />
           <IconButton
             onClick={() => fileInputRef.current?.click()}
-            disabled={!isInitialized || isStreaming || isLoading}
+            disabled={!isThreadCreated || isStreaming || isLoading}
             style={{ marginRight: '8px' }}
             aria-label="Attach files"
           >
@@ -310,7 +309,7 @@ function InputAreaComponent() {
           <StyledButton
             variant="contained"
             onClick={handleSendMessage}
-            disabled={(!input.trim() && uploadedFiles.length === 0) || !isInitialized || isStreaming || isLoading}
+            disabled={(!input.trim() && uploadedFiles.length === 0) || !isThreadCreated || isStreaming || isLoading}
             aria-label="Send message or upload files"
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
