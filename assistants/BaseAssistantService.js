@@ -1,9 +1,11 @@
 const OpenAI = require('openai');
 const connectDB = require('../config/db');
 const { EventEmitter } = require('events');
+const Assistant = require('../models/Assistant');
 const mime = require('mime');
 const path = require('path');
 const fs = require('fs');
+const dotenv = require('dotenv');
 
 class BaseAssistantService extends EventEmitter {
     constructor(apiKey) {
@@ -130,6 +132,31 @@ class BaseAssistantService extends EventEmitter {
             throw error;
         }
     }
+
+    async saveAssistantId(name, assistantId, model) {
+        try {
+          const assistant = await Assistant.findOneAndUpdate(
+            { name },
+            { assistantId, model, updated_at: new Date() },
+            { upsert: true, new: true }
+          );
+          console.log(`Assistant ${name} saved with ID: ${assistantId}`);
+          return assistant;
+        } catch (error) {
+          console.error(`Error saving assistant ${name}:`, error);
+          throw error;
+        }
+      }
+    
+      async getAssistantId(name) {
+        try {
+          const assistant = await Assistant.findOne({ name });
+          return assistant ? assistant.assistantId : null;
+        } catch (error) {
+          console.error(`Error getting assistant ID for ${name}:`, error);
+          throw error;
+        }
+      }
 
     async createThread({ messages = [], tool_resources = null, metadata = {} }) {
         try {

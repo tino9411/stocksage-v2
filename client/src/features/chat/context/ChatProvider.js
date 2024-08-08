@@ -1,4 +1,6 @@
-import React, { useMemo, useEffect } from 'react';
+// client/src/features/chat/context/ChatProvider.js
+
+import React, { useMemo, useEffect, useState } from 'react';
 import ChatContext from './ChatContext';
 import { useMessageHandling } from '../hooks/useMessageHandling';
 import { useToolCalls } from '../hooks/useToolCalls';
@@ -10,22 +12,17 @@ import * as chatApi from '../api/chatApi';
 
 export const ChatProvider = ({ children }) => {
   const { logs, addLog, addServerLogs } = useLogging();
+  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [isThreadCreated, setIsThreadCreated] = useState(false);
 
   const {
     messages,
     setMessages,
-    isInitialized,
-    setIsInitialized,
-    isConversationStarted,
-    setIsConversationStarted,
     isStreaming,
     setIsStreaming,
-    initializeAssistant,
-    startConversation,
     finalizeMessage,
     handleStreamError
   } = useMessageHandling(addLog, addServerLogs);
-
   const {
     toolCalls,
     setToolCalls,
@@ -45,7 +42,7 @@ export const ChatProvider = ({ children }) => {
     setUploadedFiles,
     uploadFile,
     removeUploadedFile
-  } = useFileHandling(addLog, addServerLogs, isInitialized, isConversationStarted);
+  } = useFileHandling(addLog, addServerLogs, isThreadCreated, currentThreadId);
 
   const { setupEventSource, closeEventSource, eventSourceRef } = useEventSource(
     addLog,
@@ -57,9 +54,23 @@ export const ChatProvider = ({ children }) => {
     handleStreamError
   );
 
+  const createThread = async () => {
+    try {
+      const response = await chatApi.createThread();
+      setCurrentThreadId(response.threadId);
+      setIsThreadCreated(true);
+      addLog('Thread created successfully');
+      return response.threadId;
+    } catch (error) {
+      console.error('Error creating thread:', error);
+      addLog(`Error creating thread: ${error.message}`);
+      throw error;
+    }
+  };
+
   const { sendMessage } = useMessageSending(
-    isInitialized,
-    isConversationStarted,
+    isThreadCreated,
+    currentThreadId,
     uploadedFiles,
     addLog,
     setIsStreaming,
@@ -87,17 +98,21 @@ export const ChatProvider = ({ children }) => {
       addLog('Ending chat...');
       closeEventSource();
       addLog('Event stream closed');
-      const response = await chatApi.endChat();
-      setMessages([]);
-      setIsInitialized(false);
-      setIsConversationStarted(false);
-      clearToolCalls();
-      setIsStreaming(false);
-      addLog('Chat ended successfully');
-      if (response && response.data && response.data.logs) {
-        addServerLogs(response.data.logs);
+      if (currentThreadId) {
+        const response = await chatApi.endChat(currentThreadId);
+        setMessages([]);
+        setIsThreadCreated(false);
+        setCurrentThreadId(null);
+        clearToolCalls();
+        setIsStreaming(false);
+        addLog('Chat ended successfully');
+        if (response && response.logs) {
+          addServerLogs(response.logs);
+        } else {
+          addLog('No server logs received');
+        }
       } else {
-        addLog('No server logs received');
+        addLog('No active thread to end');
       }
     } catch (error) {
       console.error('Error ending chat:', error);
@@ -107,10 +122,9 @@ export const ChatProvider = ({ children }) => {
 
   const contextValue = useMemo(() => ({
     messages,
-    isInitialized,
-    isConversationStarted,
-    initializeAssistant,
-    startConversation,
+    isThreadCreated,
+    currentThreadId,
+    createThread,
     sendMessage,
     endChat,
     logs,
@@ -128,10 +142,8 @@ export const ChatProvider = ({ children }) => {
     setUploadedFiles,
   }), [
     messages, 
-    isInitialized, 
-    isConversationStarted, 
-    initializeAssistant, 
-    startConversation, 
+    isThreadCreated,
+    currentThreadId,
     sendMessage, 
     logs, 
     addLog, 

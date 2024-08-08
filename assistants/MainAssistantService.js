@@ -76,16 +76,17 @@ class MainAssistantService extends BaseAssistantService {
             name,
             instructions: this.instructions,
             tools: [
-                messageSubAssistantTool,
-                uploadFileTool,
-                { type: "code_interpreter" },
-                { type: "file_search" }
+              messageSubAssistantTool,
+              uploadFileTool,
+              { type: "code_interpreter" },
+              { type: "file_search" }
             ]
-        });
-        this.assistantId = newAssistant.id;
-        this.assistantName = name;
-        this.addSystemLog('Main Assistant initialized with Code Interpreter and File Search');
-    }
+          });
+          this.assistantId = newAssistant.id;
+          this.assistantName = name;
+          await this.saveAssistantId('MAIN', this.assistantId, model);
+          this.addSystemLog('Main Assistant initialized with Code Interpreter and File Search');
+        }
 
     getMessageSubAssistantTool() {
         return {

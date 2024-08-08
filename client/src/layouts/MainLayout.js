@@ -1,5 +1,4 @@
 import React from 'react';
-import { Box } from '@mui/material';
 import { Watchlist } from '../features/watchlist';
 import Chat from '../features/chat/components/Chat';
 import { useRequireAuth } from '../hooks/useRequireAuth';

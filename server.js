@@ -12,7 +12,7 @@ const stockRoutes = require('./routes/stock');
 const userRoutes = require('./routes/user');
 const connectDB = require('./config/db');
 const executeService = require('./utils/serviceExecutor');
-const Chat = require('./services/Chat');
+const MainAssistantService = require('./assistants/MainAssistantService');
 const commandRoutes = require('./routes/command');
 const Stock = require('./services/StockService');
 const fileRoutes = require('./routes/file');
@@ -60,16 +60,27 @@ app.use(session({
 app.use(passport.initialize());
 app.use(passport.session());
 
-// Connect to MongoDB
-connectDB().then(() => {
+// Initialize the main assistant when the server starts
+async function initializeAssistant() {
+  const mainAssistant = new MainAssistantService(process.env.OPENAI_API_KEY);
+  await mainAssistant.initialize({
+      model: "gpt-4o-mini",
+      name: "Main Stock Analysis Assistant"
+  });
+  console.log('Main assistant initialized successfully');
+}
+
+connectDB().then(async () => {
   console.log('MongoDB connected successfully');
+  await initializeAssistant();
+  app.listen(port, () => {
+      console.log(`Server is running on port ${port}`);
+  });
 }).catch(err => {
   console.error('MongoDB connection error:', err);
   process.exit(1);
 });
 
-// Create a chat instance
-const chat = new Chat(process.env.OPENAI_API_KEY);
 
 // Routes
 app.use('/api/stocks', stockRoutes);
@@ -138,10 +149,6 @@ wss.on('connection', (ws) => {
 Stock.initializeWebSocket(wss);
 
 app.use(express.static(path.join(__dirname, 'public')));
-
-server.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
 
 // Graceful shutdown function
 async function gracefulShutdown() {
