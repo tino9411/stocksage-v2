@@ -13,6 +13,7 @@ function Chat() {
   const {
     createThread,
     isThreadCreated,
+    currentThreadId,
     sendMessage,
     endChat,
   } = useChatState();
@@ -50,9 +51,13 @@ function Chat() {
 
   const handleEndChat = async () => {
     try {
+      setIsLoading(true);
       await endChat();
+      // No need to call handleCreateThread here as it's done in endChat
     } catch (err) {
       setError("Failed to end the chat. Please try again.");
+    } finally {
+      setIsLoading(false);
     }
   };
 

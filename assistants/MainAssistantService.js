@@ -160,7 +160,11 @@ class MainAssistantService extends BaseAssistantService {
             const assistant = new AssistantClass(this.apiKey);
             await assistant.initialize({ model, name });
             this.subAssistants[name] = assistant;
-            this.addSystemLog(`Sub-assistant ${name} initialized`);
+            
+            // Save the sub-assistant ID
+            await this.saveAssistantId(name, assistant.assistantId, model);
+            
+            this.addSystemLog(`Sub-assistant ${name} initialized and saved with ID: ${assistant.assistantId}`);
         } catch (error) {
             this.addSystemLog(`Error initializing ${name} Assistant: ${error.message}`);
             throw error;
@@ -331,9 +335,18 @@ class MainAssistantService extends BaseAssistantService {
 
     async messageSubAssistant(subAssistantName, message) {
         this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
-        const subAssistant = this.subAssistants[subAssistantName];
+        let subAssistant = this.subAssistants[subAssistantName];
         if (!subAssistant) {
-            throw new Error(`Sub-assistant ${subAssistantName} not found`);
+            // If the sub-assistant is not in memory, try to retrieve its ID from the database
+            const savedAssistantId = await this.getAssistantId(subAssistantName);
+            if (!savedAssistantId) {
+                throw new Error(`Sub-assistant ${subAssistantName} not found`);
+            }
+            // Create a new instance of the sub-assistant with the saved ID
+            const AssistantClass = this.getAssistantClass(subAssistantName);
+            subAssistant = new AssistantClass(this.apiKey);
+            subAssistant.assistantId = savedAssistantId;
+            this.subAssistants[subAssistantName] = subAssistant;
         }
         let threadId = this.subAssistantThreads[subAssistantName];
         if (!threadId) {
@@ -347,6 +360,23 @@ class MainAssistantService extends BaseAssistantService {
         } catch (error) {
             this.addSystemLog(`Error processing message with sub-assistant ${subAssistantName}: ${error.message}`);
             return `Error: Unable to process message. ${error.message}`;
+        }
+    }
+
+    getAssistantClass(name) {
+        switch (name) {
+            case 'CompanyProfile':
+                return CompanyProfileAssistant;
+            case 'FinancialAnalysis':
+                return FinancialAnalysisAssistant;
+            case 'TechnicalAnalysis':
+                return TechnicalAnalysisAssistant;
+            case 'EconomicData':
+                return EconomicDataAssistant;
+            case 'SentimentAnalysis':
+                return SentimentAnalysisAssistant;
+            default:
+                throw new Error(`Unknown sub-assistant type: ${name}`);
         }
     }
 

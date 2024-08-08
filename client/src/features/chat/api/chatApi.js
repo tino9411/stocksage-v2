@@ -23,5 +23,5 @@ export const uploadFile = (formData) =>
 export const removeFile = (fileId) => 
   axiosInstance.delete(`/api/chat/files/${fileId}`).then(handleResponse);
 
-export const endChat = () => 
-  axiosInstance.post('/api/chat/end').then(handleResponse);
+export const endChat = (threadId) => 
+  axiosInstance.post('/api/chat/end', { threadId }).then(handleResponse);

@@ -56,6 +56,7 @@ router.post('/stream/message', async (req, res) => {
     }
 
     storedMessage = { threadId, message };
+    chat.setCurrentThreadId(threadId); // Set the current thread ID in the Chat service
     res.status(200).json({ message: "Message received", storedMessage });
   } catch (error) {
     console.error('Error processing message:', error);
@@ -64,83 +65,96 @@ router.post('/stream/message', async (req, res) => {
 });
 
 router.get('/stream', async (req, res) => {
-  if (!storedMessage) {
-    return res.status(400).json({ error: "No message stored" });
-  }
-  console.log('Received request on /stream with stored message:', storedMessage);
-  
-  res.writeHead(200, {
-    'Content-Type': 'text/event-stream',
-    'Cache-Control': 'no-cache',
-    'Connection': 'keep-alive'
-  });
-  console.log('SSE headers set');
-
-  const sendSSE = (event, data) => {
-    console.log(`Sending event: ${event} with data:`, data);
-    res.write(`event: ${event}\n`);
-    res.write(`data: ${JSON.stringify(data)}\n\n`);
-    res.flush();
-  };
-
-  const keepAlive = setInterval(() => {
-    sendSSE('ping', {});
-  }, 15000);
-
-  try {
-    console.log('Starting streamMessage');
-    await chat.streamMessage(storedMessage.threadId, storedMessage.message, async (event) => {
-      console.log('Received event:', event);
-      switch (event.type) {
-        case 'textDelta':
-          sendSSE('message', { type: 'textDelta', content: event.data.value });
-          break;
-        case 'textCreated':
-          sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });
-          break;
-        case 'requiresAction':
-          sendSSE('requiresAction', { toolCalls: event.data });
-          break;
-        case 'end':
-          sendSSE('end', { content: 'Stream ended' });
-          clearInterval(keepAlive);
-          res.end();
-          // Save the completed message to the thread
-          try {
-            const thread = await Thread.findOne({ threadId: storedMessage.threadId });
-            if (thread) {
-              thread.messages.push({
-                role: 'user',
-                content: storedMessage.message
-              });
-              thread.messages.push({
-                role: 'assistant',
-                content: event.data.content
-              });
-              thread.updatedAt = Date.now();
-              await thread.save();
-            }
-          } catch (error) {
-            console.error('Error saving message to thread:', error);
-          }
-          break;
-        case 'error':
-          sendSSE('error', { content: event.data });
-          clearInterval(keepAlive);
-          res.end();
-          break;
-      }
+    if (!storedMessage) {
+      return res.status(400).json({ error: "No message stored" });
+    }
+    console.log('Received request on /stream with stored message:', storedMessage);
+    
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive'
     });
-  } catch (error) {
-    console.error('Error streaming message:', error);
-    sendSSE('error', { content: error.message });
-    clearInterval(keepAlive);
-    res.end();
-  } finally {
-    storedMessage = null;
-  }
-});
-
+    console.log('SSE headers set');
+  
+    const sendSSE = (event, data) => {
+      console.log(`Sending event: ${event} with data:`, data);
+      res.write(`event: ${event}\n`);
+      res.write(`data: ${JSON.stringify(data)}\n\n`);
+      res.flush();
+    };
+  
+    const keepAlive = setInterval(() => {
+      sendSSE('ping', {});
+    }, 15000);
+  
+    let assistantResponse = '';
+    const currentStoredMessage = { ...storedMessage }; // Create a copy of storedMessage
+  
+    try {
+      console.log('Starting streamMessage');
+      await chat.streamMessage(currentStoredMessage.threadId, currentStoredMessage.message, async (event) => {
+        console.log('Received event:', event);
+        switch (event.type) {
+          case 'textDelta':
+            sendSSE('message', { type: 'textDelta', content: event.data.value });
+            assistantResponse += event.data.value;
+            break;
+          case 'textCreated':
+            sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });
+            assistantResponse = event.data.content[0].text.value;
+            break;
+          case 'requiresAction':
+            sendSSE('requiresAction', { toolCalls: event.data });
+            break;
+          case 'end':
+            sendSSE('end', { content: 'Stream ended' });
+            clearInterval(keepAlive);
+            // Save the completed message to the thread
+            try {
+              const thread = await Thread.findOne({ threadId: currentStoredMessage.threadId });
+              if (thread) {
+                if (currentStoredMessage.message.trim()) {
+                  thread.messages.push({
+                    role: 'user',
+                    content: currentStoredMessage.message
+                  });
+                }
+                if (assistantResponse.trim()) {
+                  thread.messages.push({
+                    role: 'assistant',
+                    content: assistantResponse
+                  });
+                }
+                thread.updatedAt = Date.now();
+                await thread.save();
+                console.log('Message saved to thread successfully');
+              } else {
+                console.log('Thread not found:', currentStoredMessage.threadId);
+              }
+            } catch (error) {
+              console.error('Error saving message to thread:', error);
+            }
+            res.end();
+            break;
+          case 'error':
+            sendSSE('error', { content: event.data });
+            clearInterval(keepAlive);
+            res.end();
+            break;
+        }
+      });
+    } catch (error) {
+      console.error('Error streaming message:', error);
+      sendSSE('error', { content: error.message });
+      clearInterval(keepAlive);
+      res.end();
+    } finally {
+      storedMessage = null; // Clear storedMessage after processing
+      chat.clearCurrentThreadId(); // Clear the current thread ID in the Chat service
+    }
+  });
+    
 router.post('/upload', upload.array('files'), async (req, res) => {
     try {
         if (!req.files || req.files.length === 0) {

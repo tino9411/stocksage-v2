@@ -101,7 +101,6 @@ export const ChatProvider = ({ children }) => {
       if (currentThreadId) {
         const response = await chatApi.endChat(currentThreadId);
         setMessages([]);
-        setIsThreadCreated(false);
         setCurrentThreadId(null);
         clearToolCalls();
         setIsStreaming(false);
@@ -111,6 +110,10 @@ export const ChatProvider = ({ children }) => {
         } else {
           addLog('No server logs received');
         }
+
+        // Automatically create a new thread
+        await createThread();
+        addLog('New thread created automatically');
       } else {
         addLog('No active thread to end');
       }
