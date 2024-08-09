@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { List, ListItem, Box, Typography } from '@mui/material';
-import { useChatState } from '../../../features/chat';
+import { useChatState } from '../hooks/useChatState';
 import MessageBubble from './MessageBubble';
 import { MessageList as StyledMessageList } from '../styles/chatStyles';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -23,7 +23,7 @@ const FileItem = styled(Box)(({ theme }) => ({
 }));
 
 function MessageList() {
-  const { messages, isStreaming } = useChatState();
+  const { messages, isStreaming, currentThreadId } = useChatState();
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
@@ -31,9 +31,7 @@ function MessageList() {
   }, []);
 
   useEffect(() => {
-    if (isStreaming) {
-      scrollToBottom();
-    }
+    scrollToBottom();
   }, [messages, isStreaming, scrollToBottom]);
 
   const formatFileSize = (bytes) => {
@@ -44,17 +42,24 @@ function MessageList() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
 
+  // Filter messages for the current thread
+  const currentThreadMessages = messages.filter(message => message.threadId === currentThreadId);
+
   return (
     <StyledMessageList component={List}>
-      {messages.map((message, index) => (
-  <ListItem
-    key={message.id || index}
-          style={{ justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start', flexDirection: 'column', alignItems: message.sender === 'user' ? 'flex-end' : 'flex-start' }}
+      {currentThreadMessages.map((message, index) => (
+        <ListItem
+          key={message.id || index}
+          style={{ 
+            justifyContent: message.sender === 'user' ? 'flex-end' : 'flex-start', 
+            flexDirection: 'column', 
+            alignItems: message.sender === 'user' ? 'flex-end' : 'flex-start' 
+          }}
         >
           {message.type === 'files' ? (
             <FileDisplay>
-              {message.files.map((file, index) => (
-                <FileItem key={index}>
+              {message.files.map((file, fileIndex) => (
+                <FileItem key={fileIndex}>
                   <AttachFileIcon fontSize="small" />
                   <Typography variant="body2">
                     {file.name} ({formatFileSize(file.size)})
@@ -63,7 +68,7 @@ function MessageList() {
               ))}
             </FileDisplay>
           ) : (
-            <MessageBubble message={message} />
+            <MessageBubble message={message} currentThreadId={currentThreadId} />
           )}
         </ListItem>
       ))}

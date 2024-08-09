@@ -58,7 +58,7 @@ const FileAttachment = styled(Box)(({ theme }) => ({
   marginTop: theme.spacing(1),
 }));
 
-function MessageBubble({ message }) {
+function MessageBubble({ message, currentThreadId }) {
   const [showCopyButton, setShowCopyButton] = useState(false);
   const handleMouseEnter = useCallback(() => setShowCopyButton(true), []);
   const handleMouseLeave = useCallback(() => setShowCopyButton(false), []);
@@ -111,6 +111,11 @@ function MessageBubble({ message }) {
     return null;
   };
 
+  // Only render the message if it belongs to the current thread
+  if (message.threadId && message.threadId !== currentThreadId) {
+    return null;
+  }
+
   return (
     <Box
       sx={{ position: 'relative', marginBottom: 2 }}
@@ -118,8 +123,8 @@ function MessageBubble({ message }) {
       onMouseLeave={handleMouseLeave}
     >
       <StyledMessageBubble isuser={message.sender === 'user' ? 'true' : 'false'}>
-  {renderContent()}
-</StyledMessageBubble>
+        {renderContent()}
+      </StyledMessageBubble>
       {showCopyButton && !message.isStreaming && (
         <Box sx={{ position: 'absolute', top: 0, right: 0 }}>
           <CopyButton text={typeof message.text === 'string' ? message.text : JSON.stringify(message.content)} />

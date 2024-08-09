@@ -1,26 +1,16 @@
-import React, { useMemo, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import ChatContext from './ChatContext';
 import { useMessageHandling } from '../hooks/useMessageHandling';
 import { useToolCalls } from '../hooks/useToolCalls';
 import { useFileHandling } from '../hooks/useFileHandling';
 import { useLogging } from '../hooks/useLogging';
-import { useMessageSending } from '../hooks/useMessageSending';
+import { useThreadManagement } from '../hooks/useThreadManagement';
 import { useEventSource } from '../hooks/useEventSource';
-import { useThreadManagement } from '../hooks/useThreadManagement'; // Import the new hook
+import { useMessageSending } from '../hooks/useMessageSending';
 
 export const ChatProvider = ({ children }) => {
   const { logs, addLog, addServerLogs } = useLogging();
-  const {
-    threads,
-    isThreadCreated,
-    currentThreadId,
-    createThread,
-    sendMessage,
-    endChat,
-    switchThread,
-    deleteThread
-  } = useThreadManagement(); // Use thread management hook
-
+  
   const {
     messages,
     setMessages,
@@ -49,7 +39,7 @@ export const ChatProvider = ({ children }) => {
     setUploadedFiles,
     uploadFile,
     removeUploadedFile
-  } = useFileHandling(addLog, addServerLogs, !!currentThreadId, currentThreadId);
+  } = useFileHandling(addLog, addServerLogs);
 
   const { setupEventSource, closeEventSource, eventSourceRef } = useEventSource(
     addLog,
@@ -61,22 +51,44 @@ export const ChatProvider = ({ children }) => {
     handleStreamError
   );
 
-  useEffect(() => {
-    if (isWaitingForToolCompletion && pendingToolCalls === 0) {
-      finalizeMessage();
-      setIsToolCallInProgress(false);
-      setIsWaitingForToolCompletion(false);
-    }
-  }, [isWaitingForToolCompletion, pendingToolCalls, finalizeMessage, setIsToolCallInProgress, setIsWaitingForToolCompletion]);
+  const {
+    threads,
+    isThreadCreated,
+    currentThreadId,
+    createThread,
+    endChat,
+    switchThread,
+    deleteThread
+  } = useThreadManagement();
+
+  const { sendMessage } = useMessageSending(
+    uploadedFiles,
+    addLog,
+    setIsStreaming,
+    setToolCalls,
+    setIsToolCallInProgress,
+    setPendingToolCalls,
+    setIsWaitingForToolCompletion,
+    finalizeMessage,
+    handleStreamError,
+    setMessages,
+    setUploadedFiles,
+    setupEventSource,
+    isThreadCreated,
+    currentThreadId,
+    createThread
+  );
 
   const contextValue = useMemo(() => ({
     messages,
     currentThreadId,
+    isThreadCreated,
     createThread,
     sendMessage,
     endChat,
     switchThread,
     deleteThread,
+    threads,
     logs,
     addLog,
     isStreaming,
@@ -93,11 +105,13 @@ export const ChatProvider = ({ children }) => {
   }), [
     messages, 
     currentThreadId,
+    isThreadCreated,
     createThread, 
     sendMessage, 
     endChat,
     switchThread,
     deleteThread,
+    threads,
     logs, 
     addLog, 
     isStreaming, 

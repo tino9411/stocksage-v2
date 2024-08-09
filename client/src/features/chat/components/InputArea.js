@@ -80,6 +80,7 @@ function InputAreaComponent() {
     sendMessage, 
     isThreadCreated, 
     addLog, 
+    addMessage, 
     isStreaming, 
     uploadFile,
     removeUploadedFile,
@@ -127,17 +128,20 @@ function InputAreaComponent() {
   }, []);
 
   const handleSendMessage = async () => {
-    if ((input.trim() || uploadedFiles.length > 0) && !isStreaming && !isLoading) {
+    if ((input.trim() || uploadedFiles.length > 0) && !isStreaming && !isLoading && currentThreadId) {
       setIsLoading(true);
       try {
         await sendMessage(input);
         setInput('');
+        setUploadedFiles([]);
       } catch (error) {
         console.error('Error during message sending:', error);
         setErrorMessage(`Error: ${error.message}`);
       } finally {
         setIsLoading(false);
       }
+    } else if (!currentThreadId) {
+      setErrorMessage('No active thread. Please create or select a thread first.');
     }
   };
 
@@ -164,7 +168,7 @@ function InputAreaComponent() {
       .catch(error => {
         setErrorMessage(`Failed to remove file: ${error.message}`);
       });
-  }, [removeUploadedFile, currentThreadId, setErrorMessage, setSuccessMessage]);
+  }, [removeUploadedFile, currentThreadId]);
 
   const handleKeyDown = (e) => {
     if (showCommands) {

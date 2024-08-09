@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useChatState } from '../hooks/useChatState'; // Import hook for chat state
+import { useChatState } from '../hooks/useChatState';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
 import ThreadSidebar from './ThreadSidebar';
 import { ChatContainer, ChatBox, ChatLayout } from '../styles/chatStyles';
-import { Button, Typography, CircularProgress } from '@mui/material';
+import { Button, Typography, CircularProgress, Snackbar } from '@mui/material';
 
 function Chat() {
   const {
@@ -16,16 +16,24 @@ function Chat() {
     endChat,
     switchThread,
     logs,
-  } = useChatState(); // Use chat state hook
+    isThreadCreated,
+  } = useChatState();
 
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [snackbarOpen, setSnackbarOpen] = useState(false);
+  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const handleCreateThread = async () => {
     try {
       setError(null);
       setIsLoading(true);
-      await createThread(); // Trigger thread creation
+      const newThreadId = await createThread();
+      if (newThreadId) {
+        await switchThread(newThreadId);
+        setSnackbarMessage('New thread created successfully');
+        setSnackbarOpen(true);
+      }
     } catch (err) {
       setError("Failed to create a new chat thread. Please try again.");
     } finally {
@@ -34,19 +42,27 @@ function Chat() {
   };
 
   const handleSendMessage = async (message) => {
-    if (message.trim()) {
+    if (message.trim() && currentThreadId) {
       try {
-        await sendMessage(message); // Send message to the current thread
+        await sendMessage(message, currentThreadId);
       } catch (err) {
         setError("Failed to send message. Please try again.");
       }
+    } else if (!currentThreadId) {
+      setError("No active thread. Please create or select a thread first.");
     }
   };
 
   const handleEndChat = async () => {
+    if (!currentThreadId) {
+      setError("No active thread to end.");
+      return;
+    }
     try {
       setIsLoading(true);
-      await endChat(); // End the current chat
+      await endChat(currentThreadId);
+      setSnackbarMessage('Chat ended successfully');
+      setSnackbarOpen(true);
     } catch (err) {
       setError("Failed to end the chat. Please try again.");
     } finally {
@@ -55,14 +71,30 @@ function Chat() {
   };
 
   const handleThreadSelect = async (threadId) => {
-    await switchThread(threadId); // Switch to a different thread
+    try {
+      setIsLoading(true);
+      await switchThread(threadId);
+      setSnackbarMessage('Switched to selected thread');
+      setSnackbarOpen(true);
+    } catch (err) {
+      setError("Failed to switch thread. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSnackbarClose = (event, reason) => {
+    if (reason === 'clickaway') {
+      return;
+    }
+    setSnackbarOpen(false);
   };
 
   if (error) {
     return (
       <ChatContainer>
         <Typography color="error">{error}</Typography>
-        <Button onClick={handleCreateThread}>Retry</Button>
+        <Button onClick={() => setError(null)}>Dismiss</Button>
       </ChatContainer>
     );
   }
@@ -70,21 +102,23 @@ function Chat() {
   return (
     <ChatContainer>
       <ChatLayout>
-        <ThreadSidebar onSelectThread={handleThreadSelect} />
+        <ThreadSidebar onSelectThread={handleThreadSelect} onCreateThread={handleCreateThread} />
         <ChatBox>
           <ChatHeader 
-            onCreateThread={handleCreateThread} 
             onEndChat={handleEndChat} 
-            currentThreadId={currentThreadId} // Pass currentThreadId to header
+            currentThreadId={currentThreadId}
+            onBackClick={() => {/* Handle navigation back */}}
           />
-          {isLoading ? (
-            <CircularProgress />
-          ) : (
+          {isThreadCreated ? (
             <>
               <MessageList />
               <ToolCallHandler />
               <InputArea onSendMessage={handleSendMessage} />
             </>
+          ) : (
+            <Typography variant="body1" align="center">
+              Please create or select a thread to start chatting.
+            </Typography>
           )}
         </ChatBox>
       </ChatLayout>

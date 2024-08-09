@@ -1,66 +1,72 @@
 import { useState, useCallback } from 'react';
-import * as chatApi from '../api/chatApi'; // Use chatApi for API calls
+import * as chatApi from '../api/chatApi';
 import { useUser } from '../../../contexts/UserContext';
 
 export const useThreadManagement = () => {
   const [threads, setThreads] = useState([]);
   const [isThreadCreated, setIsThreadCreated] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState(null);
-  const { user } = useUser(); // Get user from UserContext
+  const { user } = useUser();
 
   const fetchThreads = useCallback(async () => {
     try {
       const response = await chatApi.getThreads();
-      // Process threads to extract only the needed information
       const formattedThreads = response.map(thread => ({
-        threadId: thread.threadId, // Extract threadId
-        ...thread // Include other fields if needed
+        threadId: thread.threadId,
+        ...thread
       }));
       setThreads(formattedThreads);
     } catch (error) {
       console.error('Error fetching threads:', error);
+      throw error;
     }
   }, []);
 
   const createThread = useCallback(async () => {
     try {
       const response = await chatApi.createThread();
-      // Set the new threadId and update state
       setCurrentThreadId(response.threadId);
       setIsThreadCreated(true);
+      await fetchThreads(); // Refresh the thread list
+      return response.threadId;
     } catch (error) {
       console.error('Error creating thread:', error);
       throw error;
     }
+  }, [fetchThreads]);
+
+  const sendMessage = useCallback(async (message, threadId) => {
+    if (!threadId) {
+      throw new Error('No active thread. Please create or select a thread first.');
+    }
+    try {
+      const response = await chatApi.sendMessage(threadId, message);
+      return response;
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
   }, []);
 
-  const sendMessage = useCallback(async (message) => {
-    if (currentThreadId) {
-      try {
-        await chatApi.sendMessage(currentThreadId, message);
-      } catch (error) {
-        console.error('Error sending message:', error);
-        throw error;
-      }
+  const endChat = useCallback(async (threadId) => {
+    if (!threadId) {
+      throw new Error('No active thread to end.');
     }
-  }, [currentThreadId]);
-
-  const endChat = useCallback(async () => {
-    if (currentThreadId) {
-      try {
-        await chatApi.endChat(currentThreadId);
-        setCurrentThreadId(null);
-        setIsThreadCreated(false);
-      } catch (error) {
-        console.error('Error ending chat:', error);
-        throw error;
-      }
+    try {
+      await chatApi.endChat(threadId);
+      setCurrentThreadId(null);
+      setIsThreadCreated(false);
+      await fetchThreads(); // Refresh the thread list
+    } catch (error) {
+      console.error('Error ending chat:', error);
+      throw error;
     }
-  }, [currentThreadId]);
+  }, [fetchThreads]);
 
   const switchThread = useCallback(async (threadId) => {
     try {
       setCurrentThreadId(threadId);
+      setIsThreadCreated(true);
     } catch (error) {
       console.error('Error switching thread:', error);
       throw error;
@@ -69,18 +75,21 @@ export const useThreadManagement = () => {
 
   const deleteThread = useCallback(async (threadId) => {
     if (!user) {
-      console.error('User not authenticated');
       throw new Error('User not authenticated');
     }
-
     try {
-      await chatApi.deleteThread(threadId, user._id); // Pass user._id to the API call
+      await chatApi.deleteThread(threadId);
       setThreads(prevThreads => prevThreads.filter(thread => thread.threadId !== threadId));
+      if (currentThreadId === threadId) {
+        setCurrentThreadId(null);
+        setIsThreadCreated(false);
+      }
+      await fetchThreads(); // Refresh the thread list
     } catch (error) {
       console.error('Error deleting thread:', error);
       throw error;
     }
-  }, [user]);
+  }, [user, currentThreadId, fetchThreads]);
 
   return {
     threads,
