@@ -1,5 +1,3 @@
-// models/User.js
-
 const mongoose = require('mongoose');
 
 const UserSchema = new mongoose.Schema({
@@ -21,8 +19,7 @@ const UserSchema = new mongoose.Schema({
     type: String
   }],
   threads: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Thread'
+    type: String  // Change this to String to store OpenAI thread IDs
   }]
 }, { timestamps: true });
 

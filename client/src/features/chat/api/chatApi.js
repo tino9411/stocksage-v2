@@ -1,5 +1,4 @@
 // client/src/features/chat/api/chatApi.js
-
 import axiosInstance from '../../../axiosConfig';
 
 const handleResponse = (response) => {
@@ -20,8 +19,8 @@ export const uploadFile = (formData) =>
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then(handleResponse);
 
-export const removeFile = (fileId) => 
-  axiosInstance.delete(`/api/chat/files/${fileId}`).then(handleResponse);
+export const removeFile = (fileId, threadId) => 
+  axiosInstance.delete(`/api/chat/files/${fileId}?threadId=${threadId}`).then(handleResponse);
 
 export const endChat = (threadId) => 
   axiosInstance.post('/api/chat/end', { threadId }).then(handleResponse);

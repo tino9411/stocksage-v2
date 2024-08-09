@@ -271,53 +271,6 @@ class MainAssistantService extends BaseAssistantService {
         return run;
     }
 
-    async executeToolCalls(toolCalls) {
-        return await Promise.all(toolCalls.map(async (tool) => {
-            const result = await this.executeToolCall(tool);
-            return this.createToolOutput(tool.id, result);
-        }));
-    }
-
-    async executeToolCall(toolCall) {
-        const { id, function: { name, arguments: args } } = toolCall;
-        const parsedArgs = JSON.parse(args);
-        this.addSystemLog(`Executing tool call: ${name} with arguments: ${JSON.stringify(parsedArgs)}`);
-
-        switch (name) {
-            case 'messageSubAssistant':
-                const response = await this.messageSubAssistant(parsedArgs.subAssistantName, parsedArgs.message);
-                this.addSystemLog(`Tool call response: ${JSON.stringify(response)}`);
-                return response;
-            case 'uploadFile':
-                try {
-                    const { fileName, content } = parsedArgs;
-                    const filePath = path.join(os.tmpdir(), fileName);
-                    fs.writeFileSync(filePath, content);
-                    const uploadedFile = await this.uploadAndProcessFile(filePath);
-                    if (this.currentThreadId) {
-                        const vectorStoreName = `ThreadStore_${this.currentThreadId}`;
-                        await this.uploadFilesAndCreateVectorStore(vectorStoreName, [filePath]);
-                    } else {
-                        this.addSystemLog('Warning: No current thread ID available. File uploaded but not added to vector store.');
-                    }
-                    fs.unlinkSync(filePath); // Clean up the temporary file
-                    return `File ${fileName} uploaded successfully`;
-                } catch (error) {
-                    this.addSystemLog(`Error uploading file: ${error.message}`);
-                    return `Error uploading file: ${error.message}`;
-                }
-            default:
-                throw new Error(`Unknown function ${name}`);
-        }
-    }
-
-    createToolOutput(tool_call_id, result) {
-        return {
-            tool_call_id,
-            output: JSON.stringify(result),
-        };
-    }
-
     async submitToolOutputs(thread_id, run_id, toolOutputs) {
         try {
             await this.client.beta.threads.runs.submitToolOutputs(
@@ -330,36 +283,6 @@ class MainAssistantService extends BaseAssistantService {
         } catch (error) {
             this.addSystemLog(`Error submitting tool outputs: ${error.message}`);
             throw error;
-        }
-    }
-
-    async messageSubAssistant(subAssistantName, message) {
-        this.addSystemLog(`Messaging Sub-assistant: ${subAssistantName}`);
-        let subAssistant = this.subAssistants[subAssistantName];
-        if (!subAssistant) {
-            // If the sub-assistant is not in memory, try to retrieve its ID from the database
-            const savedAssistantId = await this.getAssistantId(subAssistantName);
-            if (!savedAssistantId) {
-                throw new Error(`Sub-assistant ${subAssistantName} not found`);
-            }
-            // Create a new instance of the sub-assistant with the saved ID
-            const AssistantClass = this.getAssistantClass(subAssistantName);
-            subAssistant = new AssistantClass(this.apiKey);
-            subAssistant.assistantId = savedAssistantId;
-            this.subAssistants[subAssistantName] = subAssistant;
-        }
-        let threadId = this.subAssistantThreads[subAssistantName];
-        if (!threadId) {
-            threadId = await this.createNewThread(subAssistantName);
-        }
-        const formattedMessage = this.formatMessage(message, subAssistant);
-        try {
-            const response = await subAssistant.processMessage(formattedMessage, threadId);
-            this.addSystemLog(`Received response from Sub-assistant ${subAssistantName}: ${JSON.stringify(response)}`);
-            return response;
-        } catch (error) {
-            this.addSystemLog(`Error processing message with sub-assistant ${subAssistantName}: ${error.message}`);
-            return `Error: Unable to process message. ${error.message}`;
         }
     }
 

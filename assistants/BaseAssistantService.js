@@ -68,7 +68,7 @@ class BaseAssistantService extends EventEmitter {
                 top_p,
                 response_format,
             });
-            this.addSystemLog(`Created Assistant: ${JSON.stringify(assistant, null, 2)}`);
+            /* this.addSystemLog(`Created Assistant: ${JSON.stringify(assistant, null, 2)}`); */
             return assistant;
         } catch (error) {
             this.addSystemLog(`Error creating assistant: ${error.message}`);

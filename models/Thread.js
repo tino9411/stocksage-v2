@@ -1,5 +1,3 @@
-// models/Thread.js
-
 const mongoose = require('mongoose');
 
 const ThreadSchema = new mongoose.Schema({
@@ -28,14 +26,24 @@ const ThreadSchema = new mongoose.Schema({
       default: Date.now
     }
   }],
-  createdAt: {
-    type: Date,
-    default: Date.now
-  },
-  updatedAt: {
-    type: Date,
-    default: Date.now
-  }
-});
+  vectorStoreFiles: [{
+    fileId: {
+      type: String,
+      required: true
+    },
+    fileName: {
+      type: String,
+      required: true
+    },
+    vectorStoreId: {
+      type: String,
+      required: true
+    },
+    uploadedAt: {
+      type: Date,
+      default: Date.now
+    }
+  }]
+}, { timestamps: true });
 
 module.exports = mongoose.model('Thread', ThreadSchema);

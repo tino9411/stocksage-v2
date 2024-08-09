@@ -85,7 +85,8 @@ function InputAreaComponent() {
     removeUploadedFile,
     uploadingFiles,
     uploadedFiles,
-    setUploadedFiles
+    setUploadedFiles,
+    currentThreadId
   } = useChatState();
   const inputRef = useRef(null);
   const popperAnchorRef = useRef(null);
@@ -144,7 +145,7 @@ function InputAreaComponent() {
     const newFiles = Array.from(event.target.files);
     for (const file of newFiles) {
       try {
-        await uploadFile(file);
+        await uploadFile(file, currentThreadId);
       } catch (error) {
         setErrorMessage(`Failed to upload ${file.name}: ${error.message}`);
       }
@@ -152,20 +153,18 @@ function InputAreaComponent() {
   };
 
   const removeFile = useCallback((fileId) => {
-    if (!fileId) {
-      console.error('Invalid file ID');
-      setErrorMessage('Failed to remove file: Invalid file ID');
+    if (!fileId || !currentThreadId) {
+      setErrorMessage('Failed to remove file: Invalid file ID or no active thread');
       return;
     }
-    removeUploadedFile(fileId)
+    removeUploadedFile(fileId, currentThreadId)
       .then(() => {
         setSuccessMessage(`File removed successfully`);
       })
       .catch(error => {
-        console.error('Error removing file:', error);
         setErrorMessage(`Failed to remove file: ${error.message}`);
       });
-  }, [removeUploadedFile, setErrorMessage, setSuccessMessage]);
+  }, [removeUploadedFile, currentThreadId, setErrorMessage, setSuccessMessage]);
 
   const handleKeyDown = (e) => {
     if (showCommands) {
@@ -224,6 +223,7 @@ function InputAreaComponent() {
       uploadingFiles={uploadingFiles}
     />
   ), [uploadedFiles, removeFile, uploadingFiles]);
+
 
   return (
     <Box>

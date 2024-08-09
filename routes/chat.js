@@ -8,9 +8,20 @@ const Thread = require('../models/Thread');
 require('dotenv').config();
 const chat = new Chat(process.env.OPENAI_API_KEY);
 const multer = require('multer');
-const upload = multer({ dest: 'uploads/' });
 const path = require('path');
 const fs = require('fs');
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+        cb(null, 'uploads/');
+    },
+    filename: function (req, file, cb) {
+        // Save the file with its original name, including the extension
+        cb(null, file.originalname);
+    }
+});
+
+const upload = multer({ storage: storage });
 
 // Helper function to process assistant response
 function processAssistantResponse(text) {
@@ -24,26 +35,25 @@ function processAssistantResponse(text) {
 let storedMessage = null;
 
 router.post('/create-thread', async (req, res) => {
-  try {
-    const userId = req.user.id; // Assuming you have user authentication middleware
-    const threadId = await chat.createThread();
-    
-    const thread = new Thread({
-      threadId: threadId,
-      user: userId
-    });
-    await thread.save();
-
-    await User.findByIdAndUpdate(userId, {
-      $push: { threads: thread._id }
-    });
-
-    res.json({ threadId, message: "Thread created successfully" });
-  } catch (error) {
-    console.error('Error creating thread:', error);
-    res.status(500).json({ error: "Failed to create thread", details: error.message });
-  }
-});
+    try {
+      const userId = req.user._id; // Assuming you have user authentication middleware that sets req.user
+      if (!userId) {
+        return res.status(401).json({ error: "User not authenticated" });
+      }
+  
+      const threadId = await chat.createThread(userId);
+      
+      // Update the User document with the string threadId
+      await User.findByIdAndUpdate(userId, {
+        $push: { threads: threadId }
+      });
+  
+      res.json({ threadId, message: "Thread created successfully" });
+    } catch (error) {
+      console.error('Error creating thread:', error);
+      res.status(500).json({ error: "Failed to create thread", details: error.message });
+    }
+  });
 
 router.post('/stream/message', async (req, res) => {
   const { threadId, message } = req.body;
@@ -56,7 +66,7 @@ router.post('/stream/message', async (req, res) => {
     }
 
     storedMessage = { threadId, message };
-    chat.setCurrentThreadId(threadId); // Set the current thread ID in the Chat service
+    chat.setCurrentThreadId(threadId);
     res.status(200).json({ message: "Message received", storedMessage });
   } catch (error) {
     console.error('Error processing message:', error);
@@ -89,7 +99,7 @@ router.get('/stream', async (req, res) => {
     }, 15000);
   
     let assistantResponse = '';
-    const currentStoredMessage = { ...storedMessage }; // Create a copy of storedMessage
+    const currentStoredMessage = { ...storedMessage };
   
     try {
       console.log('Starting streamMessage');
@@ -110,31 +120,6 @@ router.get('/stream', async (req, res) => {
           case 'end':
             sendSSE('end', { content: 'Stream ended' });
             clearInterval(keepAlive);
-            // Save the completed message to the thread
-            try {
-              const thread = await Thread.findOne({ threadId: currentStoredMessage.threadId });
-              if (thread) {
-                if (currentStoredMessage.message.trim()) {
-                  thread.messages.push({
-                    role: 'user',
-                    content: currentStoredMessage.message
-                  });
-                }
-                if (assistantResponse.trim()) {
-                  thread.messages.push({
-                    role: 'assistant',
-                    content: assistantResponse
-                  });
-                }
-                thread.updatedAt = Date.now();
-                await thread.save();
-                console.log('Message saved to thread successfully');
-              } else {
-                console.log('Thread not found:', currentStoredMessage.threadId);
-              }
-            } catch (error) {
-              console.error('Error saving message to thread:', error);
-            }
             res.end();
             break;
           case 'error':
@@ -150,8 +135,8 @@ router.get('/stream', async (req, res) => {
       clearInterval(keepAlive);
       res.end();
     } finally {
-      storedMessage = null; // Clear storedMessage after processing
-      chat.clearCurrentThreadId(); // Clear the current thread ID in the Chat service
+      storedMessage = null;
+      chat.clearCurrentThreadId();
     }
   });
     
@@ -160,39 +145,45 @@ router.post('/upload', upload.array('files'), async (req, res) => {
         if (!req.files || req.files.length === 0) {
             return res.status(400).json({ error: "No files uploaded" });
         }
-        
+
+        console.log('Received files:', req.files); // Log the files array
+
         const { threadId } = req.body;
         if (!threadId) {
             return res.status(400).json({ error: "Thread ID is required" });
         }
 
-        const filePaths = req.files.map(file => {
-            const originalName = file.originalname;
-            const newPath = path.join(path.dirname(file.path), originalName);
-            fs.renameSync(file.path, newPath);
-            console.log(`File renamed: ${file.path} -> ${newPath}`);
-            return newPath;
-        });
+        console.log(`Files to be uploaded: ${req.files.map(f => f.originalname).join(', ')}`);
 
-        console.log(`Files to be uploaded: ${JSON.stringify(filePaths)}`);
-        const uploadedFiles = await chat.addFilesToConversation(threadId, filePaths);
-        res.json({ message: "Files uploaded successfully", files: uploadedFiles });
+        // Call the chat service to handle the file upload and vector store creation
+        const result = await chat.addFilesToConversation(threadId, req.files);
+
+        res.json({ 
+            message: "Files uploaded and processed successfully", 
+            files: result 
+        });
     } catch (error) {
-        console.error('Error uploading files:', error);
-        res.status(500).json({ error: "Failed to upload files", details: error.message });
+        console.error('Error uploading and processing files:', error);
+        res.status(500).json({ error: "Failed to upload and process files", details: error.message });
     }
 });
 
-router.delete('/files/:threadId/:fileId', async (req, res) => {
-  try {
-    const { threadId, fileId } = req.params;
-    const result = await chat.deleteFileFromConversation(threadId, fileId);
-    res.json({ message: "File removed successfully", ...result });
-  } catch (error) {
-    console.error('Error removing file:', error);
-    res.status(error.status || 500).json({ error: "Failed to remove file", details: error.message });
-  }
-});
+router.delete('/files/:fileId', async (req, res) => {
+    try {
+      const { fileId } = req.params;
+      const threadId = req.query.threadId; // Add this line to get the threadId from the query parameters
+  
+      if (!threadId) {
+        return res.status(400).json({ error: "Thread ID is required" });
+      }
+  
+      await chat.deleteFileFromConversation(threadId, fileId);
+      res.json({ message: "File deleted successfully" });
+    } catch (error) {
+      console.error('Error deleting file:', error);
+      res.status(500).json({ error: "Failed to delete file", details: error.message });
+    }
+  });
 
 router.post('/end', async (req, res) => {
     try {
@@ -200,8 +191,15 @@ router.post('/end', async (req, res) => {
         if (!threadId) {
             return res.status(400).json({ error: "Thread ID is required" });
         }
-        const logs = await chat.endConversation(threadId);
-        res.json({ message: "Conversation ended successfully. Thread deleted.", logs });
+        const result = await chat.endConversation(threadId);
+        
+        // Remove the thread reference from the User document
+        const userId = req.user.id;
+        await User.findByIdAndUpdate(userId, {
+            $pull: { threads: threadId }
+        });
+
+        res.json({ message: "Conversation ended successfully. Thread deleted.", ...result });
     } catch (error) {
         console.error('Error ending conversation:', error);
         res.status(500).json({ error: "Failed to end conversation and delete resources" });

@@ -1,22 +1,20 @@
-// services/Chat.js
-
 const Assistant = require('../models/Assistant');
+const Thread = require('../models/Thread');
 const OpenAI = require('openai');
 const EventEmitter = require('events');
-const path = require('path');
-const fs = require('fs');
 const ToolExecutor = require('./toolExecutor');
+const FileService = require('./File');  // Import the new FileService
 
 class Chat extends EventEmitter {
     constructor(apiKey) {
         super();
         this.client = new OpenAI({ apiKey });
+        this.fileService = new FileService(apiKey);  // Initialize the FileService
         this.toolExecutor = new ToolExecutor(this);
         this.assistantId = null;
         this.assistantName = null;
         this.subAssistants = {};
         this.subAssistantThreads = {};
-        this.threadVectorStores = {};
         this.currentThreadId = null;
     }
 
@@ -28,7 +26,7 @@ class Chat extends EventEmitter {
         this.currentThreadId = null;
     }
 
-    async createThread() {
+    async createThread(userId) {
         try {
             const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
             if (!mainAssistant) {
@@ -37,6 +35,14 @@ class Chat extends EventEmitter {
 
             const thread = await this.client.beta.threads.create();
             this.setCurrentThreadId(thread.id);
+
+            // Create a new Thread document in the database
+            const newThread = await Thread.create({
+                threadId: thread.id,
+                user: userId,
+                messages: []
+            });
+
             return thread.id;
         } catch (error) {
             console.error('Failed to create thread:', error);
@@ -66,6 +72,20 @@ class Chat extends EventEmitter {
             await this.observeStream(stream, onEvent);
             const finalMessages = await stream.finalMessages();
             console.log('[streamMessage] Final messages:', finalMessages);
+
+            // Update the Thread document in the database
+            await Thread.findOneAndUpdate(
+                { threadId: threadId },
+                { 
+                    $push: { 
+                        messages: [
+                            { role: 'user', content: userMessage },
+                            ...finalMessages.map(msg => ({ role: msg.role, content: msg.content[0].text.value }))
+                        ] 
+                    },
+                    updatedAt: new Date()
+                }
+            );
         } catch (error) {
             console.error('[streamMessage] Error:', error);
             onEvent({ type: 'error', data: error.message });
@@ -112,89 +132,18 @@ class Chat extends EventEmitter {
         }
     }
 
-    async uploadAndProcessFile(filePath) {
-        console.log(`Uploading file: ${filePath}`);
-        const fileName = path.basename(filePath);
-        const fileStream = fs.createReadStream(filePath);
-        try {
-            const file = await this.client.files.create({
-                file: fileStream,
-                purpose: 'assistants',
-            });
-            console.log(`File uploaded successfully: ${file.id}`);
-            return { id: file.id, name: fileName };
-        } catch (error) {
-            console.error(`Error uploading file: ${error.message}`);
-            throw error;
-        }
-    }
-
-    async uploadFilesAndCreateVectorStore(name, filePaths) {
-        console.log(`Uploading files and creating vector store: ${name}`);
-        try {
-            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
-            const vectorStore = await this.client.beta.vectorStores.create({
-                name: name,
-                file_ids: uploadedFiles.map(file => file.id)
-            });
-            await this.client.beta.vectorStores.fileBatches.createAndPoll(vectorStore.id, {
-                file_ids: uploadedFiles.map(file => file.id)
-            });
-            await this.attachVectorStoreToAssistant(vectorStore.id);
-            console.log(`Vector store created and attached: ${vectorStore.id}`);
-            return vectorStore.id;
-        } catch (error) {
-            console.error(`Error uploading files and creating vector store: ${error.message}`);
-            throw error;
-        }
-    }
-
-    async attachVectorStoreToAssistant(vectorStoreId) {
-        try {
-            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
-            if (!mainAssistant) {
-                throw new Error('Main assistant not found in database');
-            }
-            await this.client.beta.assistants.update(mainAssistant.assistantId, {
-                tool_resources: { 
-                    file_search: { 
-                        vector_store_ids: [vectorStoreId] 
-                    } 
-                }
-            });
-            console.log(`Vector store ${vectorStoreId} attached to assistant ${mainAssistant.assistantId}`);
-        } catch (error) {
-            console.error(`Error attaching vector store to assistant: ${error.message}`);
-            throw error;
-        }
-    }
-
-    async createNewThread(subAssistantName) {
-        const newThread = await this.client.beta.threads.create({ metadata: { subAssistant: subAssistantName } });
-        this.subAssistantThreads[subAssistantName] = newThread.id;
-        console.log(`Created new thread for Sub-assistant ${subAssistantName}: ${newThread.id}`);
-        return newThread.id;
-    }
-
-    async addFilesToConversation(threadId, filePaths) {
+    async addFilesToConversation(threadId, files) {
         try {
             this.setCurrentThreadId(threadId);
-            const vectorStoreName = `ConversationStore_${threadId}`;
-            const uploadedFiles = await Promise.all(filePaths.map(filePath => this.uploadAndProcessFile(filePath)));
-            
-            const vectorStoreId = await this.uploadFilesAndCreateVectorStore(vectorStoreName, uploadedFiles);
-            
-            // Store the vector store ID for this thread
-            this.threadVectorStores[threadId] = vectorStoreId;
+            console.log(`[addToConversation] Starting to upload files for thread: ${threadId}`);
     
-            // Return the uploaded files with their vector store ID
-            return uploadedFiles.map(file => ({ 
-                id: file.id, 
-                name: file.name, 
-                vectorStoreId: vectorStoreId 
-            }));
+            // Use the FileService to handle file uploads and vector store creation
+            const uploadedFiles = await this.fileService.addFilesToConversation(threadId, files);
+    
+            console.log(`[addToConversation] Files successfully added to conversation for thread ${threadId}`);
+            return uploadedFiles;
         } catch (error) {
-            console.error(`Error adding files to conversation: ${error.message}`);
+            console.error(`[addToConversation] Error adding files to conversation: ${error.message}`);
             throw error;
         } finally {
             this.clearCurrentThreadId();
@@ -204,18 +153,12 @@ class Chat extends EventEmitter {
     async deleteFileFromConversation(threadId, fileId) {
         try {
             this.setCurrentThreadId(threadId);
-            const vectorStoreId = this.threadVectorStores[threadId];
-            if (!vectorStoreId) {
-                throw new Error('No vector store found for this thread');
-            }
-
-            await this.client.beta.vectorStores.files.del(vectorStoreId, fileId);
-            await this.client.files.del(fileId);
-
-            console.log(`File ${fileId} deleted from vector store ${vectorStoreId} and OpenAI`);
-            return { message: 'File deleted successfully' };
+            
+            // Use the FileService to handle file deletion
+            const result = await this.fileService.deleteFileFromConversation(threadId, fileId);
+            console.log(result.message);
         } catch (error) {
-            console.error(`Error deleting file from conversation: ${error.message}`);
+            console.error(`[deleteFileFromConversation] Error deleting file: ${error.message}`);
             throw error;
         } finally {
             this.clearCurrentThreadId();
@@ -225,17 +168,24 @@ class Chat extends EventEmitter {
     async endConversation(threadId) {
         try {
             this.setCurrentThreadId(threadId);
+            
+            // Use the FileService to handle ending the conversation and deleting all associated files
+            await this.fileService.endConversation(threadId);
+
+            // Delete the thread from OpenAI
             await this.client.beta.threads.del(threadId);
-            delete this.threadVectorStores[threadId];
+
+            // Delete the Thread document from the database
+            await Thread.deleteOne({ threadId: threadId });
+
             console.log(`Thread ${threadId} and associated resources deleted`);
             return { message: 'Conversation ended successfully' };
         } catch (error) {
-            console.error(`Error ending conversation: ${error.message}`);
+            console.error(`[endConversation] Error ending conversation: ${error.message}`);
             throw error;
         } finally {
             this.clearCurrentThreadId();
         }
     }
 }
-
 module.exports = Chat;
