@@ -36,24 +36,25 @@ let storedMessage = null;
 
 router.post('/create-thread', async (req, res) => {
     try {
-      const userId = req.user._id; // Assuming you have user authentication middleware that sets req.user
-      if (!userId) {
-        return res.status(401).json({ error: "User not authenticated" });
-      }
-  
-      const threadId = await chat.createThread(userId);
-      
-      // Update the User document with the string threadId
-      await User.findByIdAndUpdate(userId, {
-        $push: { threads: threadId }
-      });
-  
-      res.json({ threadId, message: "Thread created successfully" });
+        const userId = req.user._id;
+        if (!userId) {
+            return res.status(401).json({ error: "User not authenticated" });
+        }
+
+        const threadId = await chat.createThread(userId);
+        const newThread = new Thread({ threadId, user: userId });
+        await newThread.save();
+
+        await User.findByIdAndUpdate(userId, {
+            $push: { threads: newThread._id } // Store the ObjectId of the Thread
+        });
+
+        res.json({ threadId, message: "Thread created successfully" });
     } catch (error) {
-      console.error('Error creating thread:', error);
-      res.status(500).json({ error: "Failed to create thread", details: error.message });
+        console.error('Error creating thread:', error);
+        res.status(500).json({ error: "Failed to create thread", details: error.message });
     }
-  });
+});
 
 router.post('/stream/message', async (req, res) => {
   const { threadId, message } = req.body;
@@ -207,31 +208,62 @@ router.post('/end', async (req, res) => {
 });
 
 router.get('/threads', async (req, res) => {
-  try {
-    const userId = req.user.id; // Assuming you have user authentication middleware
-    const user = await User.findById(userId).populate('threads');
-    res.json(user.threads);
-  } catch (error) {
-    console.error('Error fetching threads:', error);
-    res.status(500).json({ error: "Failed to fetch threads" });
-  }
-});
-
-router.get('/thread/:threadId', async (req, res) => {
-  try {
-    const { threadId } = req.params;
-    const userId = req.user.id; // Assuming you have user authentication middleware
-
-    const thread = await Thread.findOne({ threadId, user: userId });
-    if (!thread) {
-      return res.status(404).json({ error: "Thread not found" });
+    try {
+      const userId = req.user.id; // Assuming you have user authentication middleware
+      const user = await User.findById(userId).populate('threads');
+  
+      // Transform threads to include threadId explicitly
+      const threads = user.threads.map(thread => ({
+        threadId: thread.threadId, // Assuming you have a `threadId` field in your Thread model
+        ...thread._doc
+      }));
+  
+      res.json(threads);
+    } catch (error) {
+      console.error('Error fetching threads:', error);
+      res.status(500).json({ error: "Failed to fetch threads" });
     }
+  });
+  
+  // Fetch a single thread by threadId
+  router.get('/thread/:threadId', async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      const userId = req.user.id; // Assuming you have user authentication middleware
+  
+      // Find the thread by threadId
+      const thread = await Thread.findOne({ threadId, user: userId });
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+  
+      res.json(thread);
+    } catch (error) {
+      console.error('Error fetching thread:', error);
+      res.status(500).json({ error: "Failed to fetch thread" });
+    }
+  });
 
-    res.json(thread);
-  } catch (error) {
-    console.error('Error fetching thread:', error);
-    res.status(500).json({ error: "Failed to fetch thread" });
-  }
+  router.delete('/thread/:threadId', async (req, res) => {
+    try {
+        const { threadId } = req.params;
+        const userId = req.user._id; // Get userId from the authenticated request
+
+        if (!threadId) {
+            return res.status(400).json({ error: "Thread ID is required" });
+        }
+
+        const result = await chat.endConversation(threadId, userId);
+
+        if (!result.success) {
+            return res.status(404).json({ error: result.message });
+        }
+
+        res.json({ message: result.message });
+    } catch (error) {
+        console.error('Error deleting thread:', error);
+        res.status(500).json({ error: "Failed to delete thread and associated resources" });
+    }
 });
 
 // Error handling middleware

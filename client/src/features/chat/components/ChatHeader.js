@@ -13,13 +13,15 @@ const Header = styled('div')(({ theme }) => ({
   justifyContent: 'space-between',
 }));
 
-function ChatHeader({ onEndChat }) {
+function ChatHeader({ onEndChat, currentThreadId }) {
   const [dialogOpen, setDialogOpen] = useState(false);
 
+  // Handle opening the dialog
   const handleEndChat = () => {
     setDialogOpen(true);
   };
 
+  // Confirm end chat and close the dialog
   const confirmEndChat = () => {
     onEndChat();
     setDialogOpen(false);
@@ -31,9 +33,11 @@ function ChatHeader({ onEndChat }) {
         <ArrowBackIcon />
       </IconButton>
       <Typography variant="h6">Stock Sage</Typography>
-      <IconButton color="inherit" onClick={handleEndChat}>
-        <CloseIcon />
-      </IconButton>
+      {currentThreadId && (
+        <IconButton color="inherit" onClick={handleEndChat}>
+          <CloseIcon />
+        </IconButton>
+      )}
       <EndChatDialog
         open={dialogOpen}
         onClose={() => setDialogOpen(false)}

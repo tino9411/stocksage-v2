@@ -1,4 +1,5 @@
 const Assistant = require('../models/Assistant');
+const User = require('../models/User');
 const Thread = require('../models/Thread');
 const OpenAI = require('openai');
 const EventEmitter = require('events');
@@ -165,27 +166,67 @@ class Chat extends EventEmitter {
         }
     }
 
-    async endConversation(threadId) {
-        try {
-            this.setCurrentThreadId(threadId);
-            
-            // Use the FileService to handle ending the conversation and deleting all associated files
-            await this.fileService.endConversation(threadId);
-
-            // Delete the thread from OpenAI
-            await this.client.beta.threads.del(threadId);
-
-            // Delete the Thread document from the database
-            await Thread.deleteOne({ threadId: threadId });
-
-            console.log(`Thread ${threadId} and associated resources deleted`);
-            return { message: 'Conversation ended successfully' };
-        } catch (error) {
-            console.error(`[endConversation] Error ending conversation: ${error.message}`);
-            throw error;
-        } finally {
-            this.clearCurrentThreadId();
+    async endConversation(threadId, userId) {
+        const maxRetries = 3;
+        let retries = 0;
+    
+        while (retries < maxRetries) {
+            try {
+                // Find the Thread document to get its ObjectId
+                const thread = await Thread.findOne({ threadId: threadId });
+                if (!thread) {
+                    console.log(`No thread found with threadId ${threadId} in the database`);
+                    return { success: false, message: 'Thread not found in the database' };
+                }
+    
+                const threadObjectId = thread._id;
+    
+                // Remove the thread reference from the User document
+                console.log(`Removing thread ${threadObjectId} reference from user ${userId}`);
+                const updateResult = await User.findByIdAndUpdate(userId, {
+                    $pull: { threads: threadObjectId }
+                });
+    
+                if (!updateResult) {
+                    console.log(`Failed to update user ${userId}. User might not exist.`);
+                    return { success: false, message: 'Failed to update user' };
+                }
+    
+                // Delete files and vector stores
+                await this.fileService.endConversation(threadId);
+    
+                // Delete from OpenAI servers
+                try {
+                    await this.client.beta.threads.del(threadId);
+                    console.log(`Thread ${threadId} deleted from OpenAI server`);
+                } catch (openAIError) {
+                    console.error(`Error deleting thread from OpenAI: ${openAIError.message}`);
+                    // Continue with local deletion even if OpenAI deletion fails
+                }
+    
+                // Delete the thread from the database
+                console.log(`Deleting thread ${threadId} from the database`);
+                await Thread.deleteOne({ _id: threadObjectId });
+    
+                // Verify deletion
+                const verifyDeletion = await Thread.findOne({ threadId: threadId });
+                if (!verifyDeletion) {
+                    console.log(`Thread ${threadId} successfully deleted from the database and removed from user's threads`);
+                    return { success: true, message: 'Thread deleted successfully and removed from user\'s threads' };
+                } else {
+                    console.log(`Thread ${threadId} not deleted from the database. Retrying...`);
+                    retries++;
+                }
+            } catch (error) {
+                console.error(`Error ending conversation for thread ${threadId}: ${error.message}`);
+                retries++;
+                if (retries >= maxRetries) {
+                    throw error;
+                }
+            }
         }
+    
+        return { success: false, message: 'Failed to delete thread after multiple attempts' };
     }
 }
 module.exports = Chat;

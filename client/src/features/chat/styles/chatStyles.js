@@ -1,7 +1,7 @@
-//client/src/styles/chatStyles.js
 import { styled } from '@mui/system';
 import { Box, TextField, Button, Fab } from '@mui/material';
 
+// Container for the entire chat interface
 export const ChatContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
@@ -12,17 +12,34 @@ export const ChatContainer = styled(Box)(({ theme }) => ({
   justifyContent: 'center',
 }));
 
+// Layout for the chat interface with a sidebar
+export const ChatLayout = styled(Box)({
+  display: 'flex',
+  flexDirection: 'row',
+  height: '100%',
+  width: '100%',  // Added width to ensure it stretches to full width
+});
+
+// Sidebar for displaying threads
+export const Sidebar = styled(Box)({
+  width: '300px',
+  backgroundColor: '#2e2e2e',
+  color: 'white',
+  padding: '10px',
+  overflowY: 'auto',
+});
+
+// Chat box where the messages and input area are displayed
 export const ChatBox = styled(Box)(({ theme }) => ({
-  width: '100%',
-  maxWidth: '900px',
+  flexGrow: 1, // Ensure the chat box takes up remaining space
   display: 'flex',
   flexDirection: 'column',
-  height: '100vh',
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
-  transform: 'scale(0.95)',
+  padding: theme.spacing(2),
 }));
 
+// Styled text field for message input
 export const StyledTextField = styled(TextField)(({ theme }) => ({
   flexGrow: 1,
   marginRight: theme.spacing(2),
@@ -37,6 +54,7 @@ export const StyledTextField = styled(TextField)(({ theme }) => ({
   },
 }));
 
+// Styled button for sending messages
 export const StyledButton = styled(Button)(({ theme }) => ({
   backgroundColor: theme.palette.primary.main,
   color: theme.palette.primary.contrastText,
@@ -50,9 +68,10 @@ export const StyledButton = styled(Button)(({ theme }) => ({
   },
 }));
 
+// List of messages with scrollable behavior
 export const MessageList = styled(Box)(({ theme }) => ({
   flexGrow: 1,
-  overflow: 'auto',
+  overflowY: 'auto',
   padding: theme.spacing(2),
   '&::-webkit-scrollbar': {
     width: '8px',
@@ -69,6 +88,7 @@ export const MessageList = styled(Box)(({ theme }) => ({
   },
 }));
 
+// Container for the input area
 export const InputArea = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   borderTop: `1px solid ${theme.palette.divider}`,
@@ -76,6 +96,7 @@ export const InputArea = styled(Box)(({ theme }) => ({
   alignItems: 'flex-end',
 }));
 
+// Floating action button for scrolling to the bottom of the chat
 export const ScrollToBottomFab = styled(Fab)(({ theme }) => ({
   position: 'absolute',
   bottom: theme.spacing(2),

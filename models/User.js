@@ -19,7 +19,8 @@ const UserSchema = new mongoose.Schema({
     type: String
   }],
   threads: [{
-    type: String  // Change this to String to store OpenAI thread IDs
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Thread' // Reference to the Thread model
   }]
 }, { timestamps: true });
 

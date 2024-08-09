@@ -1,11 +1,8 @@
-// client/src/features/chat/hooks/useMessageSending.js
-
 import { useCallback } from 'react';
 import * as chatApi from '../api/chatApi';
+import { useThreadManagement } from './useThreadManagement'; // Import the thread management hook
 
 export const useMessageSending = (
-  isThreadCreated,
-  currentThreadId,
   uploadedFiles,
   addLog,
   setIsStreaming,
@@ -19,6 +16,8 @@ export const useMessageSending = (
   setUploadedFiles,
   setupEventSource
 ) => {
+  const { isThreadCreated, currentThreadId, createThread, switchThread } = useThreadManagement(); // Use thread management hook
+
   const sendMessage = useCallback(async (input) => {
     if ((input.trim() || uploadedFiles.length > 0) && isThreadCreated && currentThreadId) {
       const newMessages = [];
@@ -81,8 +80,12 @@ export const useMessageSending = (
       }
       
       setUploadedFiles([]);
+    } else if (!isThreadCreated) {
+      // Handle the case where the thread is not created
+      await createThread(); // Ensure thread creation
+      await sendMessage(input); // Retry sending the message after thread creation
     }
-  }, [isThreadCreated, currentThreadId, uploadedFiles, addLog, setIsStreaming, setToolCalls, setIsToolCallInProgress, setPendingToolCalls, setIsWaitingForToolCompletion, finalizeMessage, handleStreamError, setMessages, setUploadedFiles, setupEventSource]);
+  }, [isThreadCreated, currentThreadId, uploadedFiles, addLog, setIsStreaming, setToolCalls, setIsToolCallInProgress, setPendingToolCalls, setIsWaitingForToolCompletion, finalizeMessage, handleStreamError, setMessages, setUploadedFiles, setupEventSource, createThread]);
 
   return { sendMessage };
 };

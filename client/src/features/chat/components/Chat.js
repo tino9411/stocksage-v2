@@ -1,37 +1,31 @@
-// client/src/features/chat/components/Chat.js
-
 import React, { useState, useEffect } from 'react';
-import { useChatState } from '../hooks/useChatState';
+import { useChatState } from '../hooks/useChatState'; // Import hook for chat state
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
-import { ChatContainer, ChatBox } from '../styles/chatStyles';
+import ThreadSidebar from './ThreadSidebar';
+import { ChatContainer, ChatBox, ChatLayout } from '../styles/chatStyles';
 import { Button, Typography, CircularProgress } from '@mui/material';
 
 function Chat() {
   const {
     createThread,
-    isThreadCreated,
     currentThreadId,
     sendMessage,
     endChat,
-  } = useChatState();
+    switchThread,
+    logs,
+  } = useChatState(); // Use chat state hook
 
   const [error, setError] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    if (!isThreadCreated) {
-      handleCreateThread();
-    }
-  }, [isThreadCreated]);
 
   const handleCreateThread = async () => {
     try {
       setError(null);
       setIsLoading(true);
-      await createThread();
+      await createThread(); // Trigger thread creation
     } catch (err) {
       setError("Failed to create a new chat thread. Please try again.");
     } finally {
@@ -42,7 +36,7 @@ function Chat() {
   const handleSendMessage = async (message) => {
     if (message.trim()) {
       try {
-        await sendMessage(message);
+        await sendMessage(message); // Send message to the current thread
       } catch (err) {
         setError("Failed to send message. Please try again.");
       }
@@ -52,13 +46,16 @@ function Chat() {
   const handleEndChat = async () => {
     try {
       setIsLoading(true);
-      await endChat();
-      // No need to call handleCreateThread here as it's done in endChat
+      await endChat(); // End the current chat
     } catch (err) {
       setError("Failed to end the chat. Please try again.");
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleThreadSelect = async (threadId) => {
+    await switchThread(threadId); // Switch to a different thread
   };
 
   if (error) {
@@ -70,28 +67,27 @@ function Chat() {
     );
   }
 
-  if (!isThreadCreated) {
-    return (
-      <ChatContainer>
-        {isLoading ? (
-          <CircularProgress />
-        ) : (
-          <Button onClick={handleCreateThread} disabled={isLoading}>
-            Start New Chat
-          </Button>
-        )}
-      </ChatContainer>
-    );
-  }
-
   return (
     <ChatContainer>
-      <ChatBox>
-        <ChatHeader onEndChat={handleEndChat} />
-        <MessageList />
-        <ToolCallHandler />
-        <InputArea onSendMessage={handleSendMessage} />
-      </ChatBox>
+      <ChatLayout>
+        <ThreadSidebar onSelectThread={handleThreadSelect} />
+        <ChatBox>
+          <ChatHeader 
+            onCreateThread={handleCreateThread} 
+            onEndChat={handleEndChat} 
+            currentThreadId={currentThreadId} // Pass currentThreadId to header
+          />
+          {isLoading ? (
+            <CircularProgress />
+          ) : (
+            <>
+              <MessageList />
+              <ToolCallHandler />
+              <InputArea onSendMessage={handleSendMessage} />
+            </>
+          )}
+        </ChatBox>
+      </ChatLayout>
     </ChatContainer>
   );
 }
