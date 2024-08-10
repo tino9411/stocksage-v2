@@ -32,12 +32,15 @@ router.post('/create-thread', async (req, res) => {
             return res.status(401).json({ error: "User not authenticated" });
         }
 
-        const threadId = await mainAssistant.createThread(userId);
-        const newThread = new Thread({ threadId, user: userId });
-        await newThread.save();
+        const metadata = {
+            createdBy: userId,
+            createdAt: new Date().toISOString(),
+            // Add any other metadata you want to associate with the thread
+        };
 
-        await User.findByIdAndUpdate(userId, {
-            $push: { threads: newThread._id } // Store the ObjectId of the Thread
+        const threadId = await mainAssistant.createThread({ 
+            userId, 
+            metadata
         });
 
         res.json({ threadId, message: "Thread created successfully" });

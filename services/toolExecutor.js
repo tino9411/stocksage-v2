@@ -11,8 +11,8 @@ const fs = require('fs');
 const os = require('os');
 
 class ToolExecutor {
-    constructor(chat) {
-        this.chat = chat;
+    constructor(mainAssistant) {
+        this.mainAssistant = mainAssistant;
         this.subAssistants = {};
     }
 
@@ -41,29 +41,29 @@ class ToolExecutor {
     }
 
     async messageSubAssistant(subAssistantName, message) {
-    console.log(`Messaging Sub-assistant: ${subAssistantName}`);
-    let subAssistant = this.subAssistants[subAssistantName];
-    if (!subAssistant) {
-        subAssistant = await this.getOrCreateSubAssistant(subAssistantName);
+        console.log(`Messaging Sub-assistant: ${subAssistantName}`);
+        let subAssistant = this.subAssistants[subAssistantName];
+        if (!subAssistant) {
+            subAssistant = await this.getOrCreateSubAssistant(subAssistantName);
+        }
+        
+        let threadId = this.mainAssistant.subAssistantThreads[subAssistantName];
+        if (!threadId) {
+            threadId = await this.mainAssistant.createThread({ subAssistantName });
+            // No need to set this.mainAssistant.subAssistantThreads[subAssistantName] = threadId
+            // as it's handled in the createThread method
+        }
+        
+        const formattedMessage = this.formatMessage(message, subAssistant);
+        try {
+            const response = await subAssistant.processMessage(formattedMessage, threadId);
+            console.log(`Received response from Sub-assistant ${subAssistantName}:`, response);
+            return response;
+        } catch (error) {
+            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
+            return `Error: Unable to process message. ${error.message}`;
+        }
     }
-    
-    let threadId = this.chat.subAssistantThreads[subAssistantName];
-    if (!threadId) {
-        // Change this line
-        threadId = await this.chat.createNewThread();
-        this.chat.subAssistantThreads[subAssistantName] = threadId;
-    }
-    
-    const formattedMessage = this.formatMessage(message, subAssistant);
-    try {
-        const response = await subAssistant.processMessage(formattedMessage, threadId);
-        console.log(`Received response from Sub-assistant ${subAssistantName}:`, response);
-        return response;
-    } catch (error) {
-        console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
-        return `Error: Unable to process message. ${error.message}`;
-    }
-}
 
     async getOrCreateSubAssistant(subAssistantName) {
         const savedAssistant = await Assistant.findOne({ name: subAssistantName });
@@ -72,7 +72,7 @@ class ToolExecutor {
         }
 
         const AssistantClass = this.getAssistantClass(subAssistantName);
-        const subAssistant = new AssistantClass(this.chat.client.apiKey);
+        const subAssistant = new AssistantClass(this.mainAssistant.client.apiKey);
         subAssistant.assistantId = savedAssistant.assistantId;
         subAssistant.assistantName = subAssistantName;
         this.subAssistants[subAssistantName] = subAssistant;
@@ -100,8 +100,8 @@ class ToolExecutor {
     formatMessage(message, subAssistant) {
         return {
             sender: {
-                id: this.chat.assistantId,
-                name: this.chat.assistantName
+                id: this.mainAssistant.assistantId,
+                name: this.mainAssistant.assistantName
             },
             receiver: {
                 id: subAssistant.assistantId,
@@ -116,10 +116,10 @@ class ToolExecutor {
             const { fileName, content } = parsedArgs;
             const filePath = path.join(os.tmpdir(), fileName);
             fs.writeFileSync(filePath, content);
-            const uploadedFile = await this.chat.uploadAndProcessFile(filePath);
-            if (this.chat.currentThreadId) {
-                const vectorStoreName = `ThreadStore_${this.chat.currentThreadId}`;
-                await this.chat.uploadFilesAndCreateVectorStore(vectorStoreName, [filePath]);
+            const uploadedFile = await this.mainAssistant.uploadAndProcessFile(filePath);
+            if (this.mainAssistant.currentThreadId) {
+                const vectorStoreName = `ThreadStore_${this.mainAssistant.currentThreadId}`;
+                await this.mainAssistant.uploadFilesAndCreateVectorStore(vectorStoreName, [filePath]);
             } else {
                 console.log('Warning: No current thread ID available. File uploaded but not added to vector store.');
             }

@@ -205,39 +205,54 @@ class MainAssistant extends BaseAssistantService {
         this.currentThreadId = null;
     }
 
-    async createThread(userId) {
+    async createThread(options = {}) {
+        const { userId, subAssistantName = null, metadata = {} } = options;
+        
         try {
-            const mainAssistant = await Assistant.findOne({ name: 'MAIN' });
-            if (!mainAssistant) {
-                throw new Error('Main assistant not found in database');
+            let assistantToUse;
+            
+            if (subAssistantName) {
+                assistantToUse = await Assistant.findOne({ name: subAssistantName });
+                if (!assistantToUse) {
+                    throw new Error(`Sub-assistant ${subAssistantName} not found in database`);
+                }
+            } else {
+                assistantToUse = await Assistant.findOne({ name: 'MAIN' });
+                if (!assistantToUse) {
+                    throw new Error('Main assistant not found in database');
+                }
             }
-    
-            const thread = await this.client.beta.threads.create();
+
+            const threadMetadata = {
+                ...metadata,
+                assistantName: subAssistantName || 'MAIN'
+            };
+
+            const thread = await this.client.beta.threads.create({ metadata: threadMetadata });
             this.setCurrentThreadId(thread.id);
-    
-            // Create a new Thread document in the database
-            const newThread = await Thread.create({
-                threadId: thread.id,
-                user: userId,
-                messages: []
-            });
-    
+
+            if (userId) {
+                const newThread = await Thread.create({
+                    threadId: thread.id,
+                    user: userId, // This should now correctly be just the userId
+                    messages: [],
+                    // We don't need to store metadata in the Thread model as it's not in the schema
+                });
+
+                // Update User document with the new thread reference
+                await User.findByIdAndUpdate(userId, {
+                    $push: { threads: newThread._id }
+                });
+            }
+
+            if (subAssistantName) {
+                this.subAssistantThreads[subAssistantName] = thread.id;
+            }
+
+            console.log(`Thread created: ${thread.id} for ${subAssistantName || 'MAIN'} assistant`);
             return thread.id;
         } catch (error) {
             console.error('Failed to create thread:', error);
-            throw error;
-        }
-    }
-
-    async createNewThread(subAssistantName) {
-        try {
-            const thread = await this.client.beta.threads.create({ 
-                metadata: { subAssistant: subAssistantName } 
-            });
-            this.subAssistantThreads[subAssistantName] = thread.id;
-            return thread.id;
-        } catch (error) {
-            console.error(`Failed to create new thread for Sub-assistant ${subAssistantName}:`, error);
             throw error;
         }
     }
@@ -442,46 +457,6 @@ class MainAssistant extends BaseAssistantService {
             console.error(`Error creating vector store and uploading files: ${error.message}`);
             throw error;
         }
-    }
-
-    // Method to handle sub-assistant messaging (from ToolExecutor)
-    async messageSubAssistant(subAssistantName, message) {
-        console.log(`Messaging Sub-assistant: ${subAssistantName}`);
-        let subAssistant = this.subAssistants[subAssistantName];
-        if (!subAssistant) {
-            subAssistant = await this.getOrCreateSubAssistant(subAssistantName);
-        }
-        
-        let threadId = this.subAssistantThreads[subAssistantName];
-        if (!threadId) {
-            threadId = await this.createNewThread(subAssistantName);
-            this.subAssistantThreads[subAssistantName] = threadId;
-        }
-        
-        const formattedMessage = this.formatMessage(message, subAssistant);
-        try {
-            const response = await subAssistant.processMessage(formattedMessage, threadId);
-            console.log(`Received response from Sub-assistant ${subAssistantName}:`, response);
-            return response;
-        } catch (error) {
-            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
-            return `Error: Unable to process message. ${error.message}`;
-        }
-    }
-
-    async getOrCreateSubAssistant(subAssistantName) {
-        const savedAssistant = await Assistant.findOne({ name: subAssistantName });
-        if (!savedAssistant) {
-            throw new Error(`Sub-assistant ${subAssistantName} not found in database`);
-        }
-
-        const AssistantClass = this.getAssistantClass(subAssistantName);
-        const subAssistant = new AssistantClass(this.apiKey);
-        subAssistant.assistantId = savedAssistant.assistantId;
-        subAssistant.assistantName = subAssistantName;
-        this.subAssistants[subAssistantName] = subAssistant;
-
-        return subAssistant;
     }
 
     getAssistantClass(name) {
