@@ -21,7 +21,6 @@ function ThreadSidebar({ onSelectThread, selectedThreadId, threads, onCreateThre
     return (
         <StyledThreadSidebar>
             <ThreadSidebarHeader>
-                <Typography variant="h6">Threads</Typography>
                 <StyledThreadButton
                     variant="outlined"
                     size="small"
