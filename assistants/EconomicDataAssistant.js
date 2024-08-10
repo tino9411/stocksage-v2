@@ -43,7 +43,7 @@ class EconomicDataAssistant extends BaseAssistantService {
             tools: tools
         });
         this.assistantId = newAssistant.id;
-        console.log('Economic Data Assistant initialized:', newAssistant);
+        console.log('Economic Data Assistant initialized:');
     }
 
     createTreasuryRatesTool() {

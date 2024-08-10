@@ -59,7 +59,7 @@ class FinancialAnalysisAssistant extends BaseAssistantService {
             tools: tools
         });
         this.assistantId = newAssistant.id;
-        console.log('Financial Analysis Assistant initialized:', newAssistant);
+        console.log('Financial Analysis Assistant initialized:');
     }
 
     createFetchFinancialStatementsTool() {
@@ -209,8 +209,6 @@ class FinancialAnalysisAssistant extends BaseAssistantService {
             }
         };
     }
-
-    
 
     createPriceTargetTool() {
         return {

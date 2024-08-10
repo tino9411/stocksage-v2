@@ -172,7 +172,7 @@ class CompanyProfileAssistant extends BaseAssistantService {
             ]
         });
         this.assistantId = newAssistant.id;
-        console.log('Company Profile Assistant initialized:', newAssistant);
+        console.log('Company Profile Assistant initialized:');
     }
 
     async processMessage(message, threadId) {

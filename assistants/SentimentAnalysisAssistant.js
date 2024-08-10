@@ -43,7 +43,7 @@ class SentimentAnalysisAssistant extends BaseAssistantService {
             tools: tools
         });
         this.assistantId = newAssistant.id;
-        console.log('Sentiment Analysis Assistant initialized:', newAssistant);
+        console.log('Sentiment Analysis Assistant initialized');
     }
 
     createHistoricalSentimentTool() {

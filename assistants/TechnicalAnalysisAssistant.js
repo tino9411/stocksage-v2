@@ -63,7 +63,7 @@ class TechnicalAnalysisAssistant extends BaseAssistantService {
             tools: [calculateTechnicalIndicatorsTool, fetchRealTimeQuoteTool]
         });
         this.assistantId = newAssistant.id;
-        console.log('Technical Analysis Assistant initialized:', newAssistant);
+        console.log('Technical Analysis Assistant initialized');
     }
 
     async handleRequiresAction(thread_id, run) {

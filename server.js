@@ -11,12 +11,9 @@ const chatRouter = require('./routes/chat');
 const stockRoutes = require('./routes/stock');
 const userRoutes = require('./routes/user');
 const connectDB = require('./config/db');
-const executeService = require('./utils/serviceExecutor');
-const MainAssistantService = require('./assistants/MainAssistantService');
-const commandRoutes = require('./routes/command');
+const MainAssistantService = require('./assistants/MainAssistant');
 const Stock = require('./services/StockService');
 const fileRoutes = require('./routes/file');
-
 
 const app = express();
 
@@ -61,8 +58,9 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Initialize the main assistant when the server starts
+let mainAssistant;
 async function initializeAssistant() {
-  const mainAssistant = new MainAssistantService(process.env.OPENAI_API_KEY);
+  mainAssistant = new MainAssistantService(process.env.OPENAI_API_KEY);
   await mainAssistant.initialize({
       model: "gpt-4o-mini",
       name: "Main Stock Analysis Assistant"
@@ -73,7 +71,7 @@ async function initializeAssistant() {
 connectDB().then(async () => {
   console.log('MongoDB connected successfully');
   await initializeAssistant();
-  app.listen(port, () => {
+  server.listen(port, () => {
       console.log(`Server is running on port ${port}`);
   });
 }).catch(err => {
@@ -81,13 +79,10 @@ connectDB().then(async () => {
   process.exit(1);
 });
 
-
 // Routes
 app.use('/api/stocks', stockRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRouter);
-app.use('/api/command', commandRoutes);
-app.use(fileRoutes);
 
 // Auth routes
 app.get('/auth/google',
@@ -153,9 +148,9 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Graceful shutdown function
 async function gracefulShutdown() {
   console.log('Shutting down gracefully...');
-  if (chat.mainAssistant) {
+  if (mainAssistant) {
     console.log('Deleting assistants and threads...');
-    await chat.endConversation();
+    await mainAssistant.deleteAllAssistants();
   }
   wss.clients.forEach((client) => {
     client.close();
