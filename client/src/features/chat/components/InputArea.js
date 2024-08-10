@@ -128,7 +128,7 @@ function InputAreaComponent() {
   }, []);
 
   const handleSendMessage = async () => {
-    if ((input.trim() || uploadedFiles.length > 0) && !isStreaming && !isLoading && currentThreadId) {
+    if ((input.trim() || uploadedFiles.length > 0) && !isStreaming && !isLoading) {
       setIsLoading(true);
       try {
         await sendMessage(input);
@@ -140,8 +140,8 @@ function InputAreaComponent() {
       } finally {
         setIsLoading(false);
       }
-    } else if (!currentThreadId) {
-      setErrorMessage('No active thread. Please create or select a thread first.');
+    } else if (!input.trim() && uploadedFiles.length === 0) {
+      setErrorMessage('Please enter a message or upload a file before sending.');
     }
   };
 
@@ -228,7 +228,6 @@ function InputAreaComponent() {
     />
   ), [uploadedFiles, removeFile, uploadingFiles]);
 
-
   return (
     <Box>
       {memoizedFilePreviewComponent}
@@ -242,7 +241,7 @@ function InputAreaComponent() {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              disabled={!isThreadCreated || isStreaming || isLoading}
+              disabled={isStreaming || isLoading}
               multiline
               minRows={1}
               maxRows={4}
@@ -304,7 +303,7 @@ function InputAreaComponent() {
           />
           <IconButton
             onClick={() => fileInputRef.current?.click()}
-            disabled={!isThreadCreated || isStreaming || isLoading}
+            disabled={isStreaming || isLoading}
             style={{ marginRight: '8px' }}
             aria-label="Attach files"
           >
@@ -313,7 +312,7 @@ function InputAreaComponent() {
           <StyledButton
             variant="contained"
             onClick={handleSendMessage}
-            disabled={(!input.trim() && uploadedFiles.length === 0) || !isThreadCreated || isStreaming || isLoading}
+            disabled={((!input.trim() && uploadedFiles.length === 0) || isStreaming || isLoading)}
             aria-label="Send message or upload files"
           >
             {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
