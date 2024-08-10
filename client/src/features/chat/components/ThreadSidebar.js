@@ -1,8 +1,6 @@
-import React, { useEffect, useCallback } from 'react';
+import React from 'react';
 import { Typography } from '@mui/material';
 import AddIcon from '@mui/icons-material/Add';
-import DeleteIcon from '@mui/icons-material/Delete';
-import { useThreadManagement } from '../hooks/useThreadManagement';
 import { getRelativeTime } from '../utils/dateUtils';
 import {
     ThreadSidebar as StyledThreadSidebar,
@@ -12,43 +10,10 @@ import {
     StyledThreadButton,
     ThreadTitle,
     ThreadInfo,
-    DeleteButton,
     ThreadListItemContent
 } from '../styles/threadStyles';
 
-function ThreadSidebar({ onSelectThread, selectedThreadId }) {
-    const { threads, fetchThreads, createThread, deleteThread } = useThreadManagement();
-
-    const fetchThreadsMemoized = useCallback(() => {
-        fetchThreads();
-    }, [fetchThreads]);
-
-    useEffect(() => {
-        fetchThreadsMemoized();
-        const intervalId = setInterval(fetchThreadsMemoized, 30000);
-        return () => clearInterval(intervalId);
-    }, [fetchThreadsMemoized]);
-
-    const handleCreateThread = async () => {
-        try {
-            const newThreadId = await createThread();
-            onSelectThread(newThreadId);
-            fetchThreadsMemoized();
-        } catch (error) {
-            console.error('Failed to create a new thread:', error);
-        }
-    };
-
-    const handleThreadDelete = async (threadId, event) => {
-        event.stopPropagation();
-        try {
-            await deleteThread(threadId);
-            fetchThreadsMemoized();
-        } catch (error) {
-            console.error('Error deleting thread:', error);
-        }
-    };
-
+function ThreadSidebar({ onSelectThread, selectedThreadId, threads, onCreateThread }) {
     const getThreadTitle = (threadId) => {
         return `${threadId.slice(0, 27)}...`;
     };
@@ -60,7 +25,7 @@ function ThreadSidebar({ onSelectThread, selectedThreadId }) {
                 <StyledThreadButton
                     variant="outlined"
                     size="small"
-                    onClick={handleCreateThread}
+                    onClick={onCreateThread}
                     startIcon={<AddIcon />}
                 >
                     New
@@ -80,14 +45,6 @@ function ThreadSidebar({ onSelectThread, selectedThreadId }) {
                                 <ThreadTitle>{getThreadTitle(thread.threadId)}</ThreadTitle>
                                 <ThreadInfo>{`${getRelativeTime(new Date(thread.createdAt))}`}</ThreadInfo>
                             </ThreadListItemContent>
-                            <DeleteButton
-                                className="delete-button"
-                                size="small"
-                                onClick={(event) => handleThreadDelete(thread.threadId, event)}
-                                aria-label="delete thread"
-                            >
-                                <DeleteIcon fontSize="small" />
-                            </DeleteButton>
                         </ThreadListItem>
                     ))
                 )}

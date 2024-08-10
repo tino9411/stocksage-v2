@@ -6,7 +6,7 @@ import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
 import ThreadSidebar from './ThreadSidebar';
 import { ChatContainer, ChatBox, ChatLayout } from '../styles/chatStyles';
-import { Button, Typography, CircularProgress, Snackbar } from '@mui/material';
+import { Typography} from '@mui/material';
 
 function Chat() {
   const {
@@ -17,27 +17,21 @@ function Chat() {
     switchThread,
     logs,
     isThreadCreated,
+    threads, // Add this to get access to the threads state
   } = useChatState();
 
   const [error, setError] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [snackbarOpen, setSnackbarOpen] = useState(false);
-  const [snackbarMessage, setSnackbarMessage] = useState('');
 
   const handleCreateThread = async () => {
     try {
       setError(null);
-      setIsLoading(true);
       const newThreadId = await createThread();
       if (newThreadId) {
         await switchThread(newThreadId);
-        setSnackbarMessage('New thread created successfully');
-        setSnackbarOpen(true);
       }
     } catch (err) {
       setError("Failed to create a new chat thread. Please try again.");
     } finally {
-      setIsLoading(false);
     }
   };
 
@@ -59,42 +53,24 @@ function Chat() {
       return;
     }
     try {
-      setIsLoading(true);
       await endChat(currentThreadId);
-      setSnackbarMessage('Chat ended successfully');
-      setSnackbarOpen(true);
     } catch (err) {
       setError("Failed to end the chat. Please try again.");
-    } finally {
-      setIsLoading(false);
-    }
+    } 
   };
 
   const handleThreadSelect = async (threadId) => {
     try {
-      setIsLoading(true);
       await switchThread(threadId);
-      setSnackbarMessage('Switched to selected thread');
-      setSnackbarOpen(true);
     } catch (err) {
       setError("Failed to switch thread. Please try again.");
-    } finally {
-      setIsLoading(false);
     }
-  };
-
-  const handleSnackbarClose = (event, reason) => {
-    if (reason === 'clickaway') {
-      return;
-    }
-    setSnackbarOpen(false);
   };
 
   if (error) {
     return (
       <ChatContainer>
         <Typography color="error">{error}</Typography>
-        <Button onClick={() => setError(null)}>Dismiss</Button>
       </ChatContainer>
     );
   }
@@ -102,12 +78,16 @@ function Chat() {
   return (
     <ChatContainer>
       <ChatLayout>
-        <ThreadSidebar onSelectThread={handleThreadSelect} onCreateThread={handleCreateThread} />
+        <ThreadSidebar 
+          onSelectThread={handleThreadSelect} 
+          onCreateThread={handleCreateThread}
+          threads={threads} // Pass threads to ThreadSidebar
+          selectedThreadId={currentThreadId}
+        />
         <ChatBox>
           <ChatHeader 
             onEndChat={handleEndChat} 
             currentThreadId={currentThreadId}
-            onBackClick={() => {/* Handle navigation back */}}
           />
           {isThreadCreated ? (
             <>

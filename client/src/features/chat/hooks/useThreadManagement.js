@@ -1,7 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import * as chatApi from '../api/chatApi';
 import { useUser } from '../../../contexts/UserContext';
-import { useMessageSending } from './useMessageSending';
 
 export const useThreadManagement = () => {
   const [threads, setThreads] = useState([]);
@@ -10,42 +9,6 @@ export const useThreadManagement = () => {
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [messages, setMessages] = useState([]);
   const { user } = useUser();
-
-  const addLog = useCallback((log) => {
-    console.log(log);
-  }, []);
-
-  const setIsStreaming = useCallback((isStreaming) => {
-    // Implement streaming state management
-  }, []);
-
-  const setToolCalls = useCallback((toolCalls) => {
-    // Implement tool calls state management
-  }, []);
-
-  const setIsToolCallInProgress = useCallback((isInProgress) => {
-    // Implement tool call progress state management
-  }, []);
-
-  const setPendingToolCalls = useCallback((pendingCalls) => {
-    // Implement pending tool calls state management
-  }, []);
-
-  const setIsWaitingForToolCompletion = useCallback((isWaiting) => {
-    // Implement waiting for tool completion state management
-  }, []);
-
-  const finalizeMessage = useCallback((message) => {
-    // Implement message finalization logic
-  }, []);
-
-  const handleStreamError = useCallback(() => {
-    // Implement stream error handling
-  }, []);
-
-  const setupEventSource = useCallback((url) => {
-    // Implement event source setup
-  }, []);
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -57,9 +20,14 @@ export const useThreadManagement = () => {
       setThreads(formattedThreads);
     } catch (error) {
       console.error('Error fetching threads:', error);
-      throw error;
     }
   }, []);
+
+  useEffect(() => {
+    fetchThreads();
+    const intervalId = setInterval(fetchThreads, 30000);
+    return () => clearInterval(intervalId);
+  }, [fetchThreads]);
 
   const createThread = useCallback(async () => {
     try {
@@ -67,31 +35,13 @@ export const useThreadManagement = () => {
       const newThreadId = response.threadId;
       setCurrentThreadId(newThreadId);
       setIsThreadCreated(true);
-      await fetchThreads(); // Refresh the thread list
+      setThreads(prevThreads => [...prevThreads, { threadId: newThreadId, createdAt: new Date() }]);
       return newThreadId;
     } catch (error) {
       console.error('Error creating thread:', error);
       throw error;
     }
-  }, [fetchThreads]);
-
-  const { sendMessage: sendMessageInternal } = useMessageSending(
-    uploadedFiles,
-    addLog,
-    setIsStreaming,
-    setToolCalls,
-    setIsToolCallInProgress,
-    setPendingToolCalls,
-    setIsWaitingForToolCompletion,
-    finalizeMessage,
-    handleStreamError,
-    setMessages,
-    setUploadedFiles,
-    setupEventSource,
-    isThreadCreated,
-    currentThreadId,
-    createThread
-  );
+  }, []);
 
   const sendMessage = useCallback(async (input) => {
     if (!isThreadCreated || !currentThreadId) {
@@ -102,8 +52,17 @@ export const useThreadManagement = () => {
         throw error;
       }
     }
-    await sendMessageInternal(input);
-  }, [isThreadCreated, currentThreadId, createThread, sendMessageInternal]);
+    try {
+      const response = await chatApi.sendMessage(currentThreadId, input);
+      setMessages(prevMessages => [...prevMessages, { id: Date.now(), text: input, sender: 'user' }]);
+      if (response.message) {
+        setMessages(prevMessages => [...prevMessages, { id: Date.now(), text: response.message, sender: 'assistant' }]);
+      }
+    } catch (error) {
+      console.error('Error sending message:', error);
+      throw error;
+    }
+  }, [isThreadCreated, currentThreadId, createThread]);
 
   const endChat = useCallback(async () => {
     if (!currentThreadId) {
@@ -111,9 +70,12 @@ export const useThreadManagement = () => {
     }
     try {
       await chatApi.endChat(currentThreadId);
+      setThreads(prevThreads => prevThreads.filter(thread => thread.threadId !== currentThreadId));
       setCurrentThreadId(null);
       setIsThreadCreated(false);
-      await fetchThreads(); // Refresh the thread list
+      setMessages([]);
+      // Trigger a re-fetch of threads to ensure UI is up-to-date
+      fetchThreads();
     } catch (error) {
       console.error('Error ending chat:', error);
       throw error;
@@ -124,7 +86,6 @@ export const useThreadManagement = () => {
     try {
       setCurrentThreadId(threadId);
       setIsThreadCreated(true);
-      // Load messages for the selected thread
       const threadMessages = await chatApi.getThreadMessages(threadId);
       setMessages(threadMessages);
     } catch (error) {
@@ -133,29 +94,9 @@ export const useThreadManagement = () => {
     }
   }, []);
 
-  const deleteThread = useCallback(async (threadId) => {
-    if (!user) {
-      throw new Error('User not authenticated');
-    }
-    try {
-      await chatApi.deleteThread(threadId);
-      setThreads(prevThreads => prevThreads.filter(thread => thread.threadId !== threadId));
-      if (currentThreadId === threadId) {
-        setCurrentThreadId(null);
-        setIsThreadCreated(false);
-        setMessages([]); // Clear messages when deleting the current thread
-      }
-      await fetchThreads(); // Refresh the thread list
-    } catch (error) {
-      console.error('Error deleting thread:', error);
-      throw error;
-    }
-  }, [user, currentThreadId, fetchThreads]);
-
   return {
     threads,
     fetchThreads,
-    deleteThread,
     createThread,
     isThreadCreated,
     currentThreadId,
@@ -163,6 +104,7 @@ export const useThreadManagement = () => {
     endChat,
     switchThread,
     messages,
+    uploadedFiles,
     setUploadedFiles,
   };
 };
