@@ -1,12 +1,51 @@
 import { useState, useCallback } from 'react';
 import * as chatApi from '../api/chatApi';
 import { useUser } from '../../../contexts/UserContext';
+import { useMessageSending } from './useMessageSending';
 
 export const useThreadManagement = () => {
   const [threads, setThreads] = useState([]);
   const [isThreadCreated, setIsThreadCreated] = useState(false);
   const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [uploadedFiles, setUploadedFiles] = useState([]);
+  const [messages, setMessages] = useState([]);
   const { user } = useUser();
+
+  const addLog = useCallback((log) => {
+    console.log(log); // You can implement a more sophisticated logging system if needed
+  }, []);
+
+  const setIsStreaming = useCallback((isStreaming) => {
+    // Implement streaming state management
+  }, []);
+
+  const setToolCalls = useCallback((toolCalls) => {
+    // Implement tool calls state management
+  }, []);
+
+  const setIsToolCallInProgress = useCallback((isInProgress) => {
+    // Implement tool call progress state management
+  }, []);
+
+  const setPendingToolCalls = useCallback((pendingCalls) => {
+    // Implement pending tool calls state management
+  }, []);
+
+  const setIsWaitingForToolCompletion = useCallback((isWaiting) => {
+    // Implement waiting for tool completion state management
+  }, []);
+
+  const finalizeMessage = useCallback((message) => {
+    // Implement message finalization logic
+  }, []);
+
+  const handleStreamError = useCallback(() => {
+    // Implement stream error handling
+  }, []);
+
+  const setupEventSource = useCallback((url) => {
+    // Implement event source setup
+  }, []);
 
   const fetchThreads = useCallback(async () => {
     try {
@@ -35,25 +74,42 @@ export const useThreadManagement = () => {
     }
   }, [fetchThreads]);
 
-  const sendMessage = useCallback(async (message, threadId) => {
-    if (!threadId) {
-      throw new Error('No active thread. Please create or select a thread first.');
-    }
-    try {
-      const response = await chatApi.sendMessage(threadId, message);
-      return response;
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
-  }, []);
+  const { sendMessage: sendMessageInternal } = useMessageSending(
+    uploadedFiles,
+    addLog,
+    setIsStreaming,
+    setToolCalls,
+    setIsToolCallInProgress,
+    setPendingToolCalls,
+    setIsWaitingForToolCompletion,
+    finalizeMessage,
+    handleStreamError,
+    setMessages,
+    setUploadedFiles,
+    setupEventSource,
+    isThreadCreated,
+    currentThreadId,
+    createThread
+  );
 
-  const endChat = useCallback(async (threadId) => {
-    if (!threadId) {
+  const sendMessage = useCallback(async (input) => {
+    if (!isThreadCreated || !currentThreadId) {
+      try {
+        await createThread();
+      } catch (error) {
+        console.error('Error creating thread before sending message:', error);
+        throw error;
+      }
+    }
+    await sendMessageInternal(input);
+  }, [isThreadCreated, currentThreadId, createThread, sendMessageInternal]);
+
+  const endChat = useCallback(async () => {
+    if (!currentThreadId) {
       throw new Error('No active thread to end.');
     }
     try {
-      await chatApi.endChat(threadId);
+      await chatApi.endChat(currentThreadId);
       setCurrentThreadId(null);
       setIsThreadCreated(false);
       await fetchThreads(); // Refresh the thread list
@@ -61,7 +117,7 @@ export const useThreadManagement = () => {
       console.error('Error ending chat:', error);
       throw error;
     }
-  }, [fetchThreads]);
+  }, [currentThreadId, fetchThreads]);
 
   const switchThread = useCallback(async (threadId) => {
     try {
@@ -101,5 +157,7 @@ export const useThreadManagement = () => {
     sendMessage,
     endChat,
     switchThread,
+    messages,
+    setUploadedFiles,
   };
 };
