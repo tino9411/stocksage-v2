@@ -13,7 +13,6 @@ const userRoutes = require('./routes/user');
 const connectDB = require('./config/db');
 const MainAssistantService = require('./assistants/MainAssistant');
 const Stock = require('./services/StockService');
-const fileRoutes = require('./routes/file');
 
 const app = express();
 

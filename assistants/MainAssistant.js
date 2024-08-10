@@ -5,8 +5,7 @@ const TechnicalAnalysisAssistant = require('./TechnicalAnalysisAssistant');
 const EconomicDataAssistant = require('./EconomicDataAssistant');
 const SentimentAnalysisAssistant = require('./SentimentAnalysisAssistant');
 const OpenAI = require('openai');
-const EventEmitter = require('events');
-const ToolExecutor = require('../services/toolExecutor');
+const ToolExecutor = require('../services/ToolExecutor');
 const FileService = require('../services/File');
 const Thread = require('../models/Thread');
 const User = require('../models/User');
@@ -455,6 +454,22 @@ class MainAssistant extends BaseAssistantService {
             return await this.fileService.uploadFilesAndCreateVectorStore(name, files);
         } catch (error) {
             console.error(`Error creating vector store and uploading files: ${error.message}`);
+            throw error;
+        }
+    }
+
+    async deleteAllVectorStores() {
+        this.addSystemLog('Deleting all vector stores...');
+        try {
+            // Assuming you're using OpenAI's vector store functionality
+            const vectorStores = await this.client.beta.vectorStores.list();
+            for (const store of vectorStores.data) {
+                await this.client.beta.vectorStores.del(store.id);
+                this.addSystemLog(`Deleted vector store: ${store.id}`);
+            }
+            this.addSystemLog('All vector stores deleted successfully');
+        } catch (error) {
+            this.addSystemLog(`Error deleting vector stores: ${error.message}`);
             throw error;
         }
     }
