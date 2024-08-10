@@ -12,7 +12,7 @@ export const useThreadManagement = () => {
   const { user } = useUser();
 
   const addLog = useCallback((log) => {
-    console.log(log); // You can implement a more sophisticated logging system if needed
+    console.log(log);
   }, []);
 
   const setIsStreaming = useCallback((isStreaming) => {
@@ -64,10 +64,11 @@ export const useThreadManagement = () => {
   const createThread = useCallback(async () => {
     try {
       const response = await chatApi.createThread();
-      setCurrentThreadId(response.threadId);
+      const newThreadId = response.threadId;
+      setCurrentThreadId(newThreadId);
       setIsThreadCreated(true);
       await fetchThreads(); // Refresh the thread list
-      return response.threadId;
+      return newThreadId;
     } catch (error) {
       console.error('Error creating thread:', error);
       throw error;
@@ -123,6 +124,9 @@ export const useThreadManagement = () => {
     try {
       setCurrentThreadId(threadId);
       setIsThreadCreated(true);
+      // Load messages for the selected thread
+      const threadMessages = await chatApi.getThreadMessages(threadId);
+      setMessages(threadMessages);
     } catch (error) {
       console.error('Error switching thread:', error);
       throw error;
@@ -139,6 +143,7 @@ export const useThreadManagement = () => {
       if (currentThreadId === threadId) {
         setCurrentThreadId(null);
         setIsThreadCreated(false);
+        setMessages([]); // Clear messages when deleting the current thread
       }
       await fetchThreads(); // Refresh the thread list
     } catch (error) {

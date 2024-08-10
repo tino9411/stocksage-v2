@@ -233,6 +233,26 @@ router.get('/thread/:threadId', async (req, res) => {
     }
 });
 
+router.get('/thread/:threadId/messages', async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      const userId = req.user.id; // Assuming you have user authentication middleware
+  
+      // Find the thread by threadId and userId
+      const thread = await Thread.findOne({ threadId, user: userId });
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+  
+      // Return the messages from the thread
+      res.json(thread.messages);
+    } catch (error) {
+      console.error('Error fetching thread messages:', error);
+      res.status(500).json({ error: "Failed to fetch thread messages" });
+    }
+  });
+  
+
 router.delete('/thread/:threadId', async (req, res) => {
     try {
         const { threadId } = req.params;

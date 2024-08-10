@@ -1,4 +1,3 @@
-// client/src/features/chat/api/chatApi.js
 import axiosInstance from '../../../axiosConfig';
 
 const handleResponse = (response) => {
@@ -25,10 +24,12 @@ export const removeFile = (fileId, threadId) =>
 export const endChat = (threadId) => 
   axiosInstance.post('/api/chat/end', { threadId }).then(handleResponse);
 
-// New functions for thread management
-
 export const getThreads = () => 
   axiosInstance.get('/api/chat/threads').then(handleResponse);
 
 export const deleteThread = (threadId) => 
   axiosInstance.delete(`/api/chat/thread/${threadId}`).then(handleResponse);
+
+// New function to get messages for a specific thread
+export const getThreadMessages = (threadId) => 
+  axiosInstance.get(`/api/chat/thread/${threadId}/messages`).then(handleResponse);

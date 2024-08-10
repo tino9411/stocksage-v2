@@ -31,7 +31,8 @@ function ThreadSidebar({ onSelectThread, selectedThreadId }) {
 
     const handleCreateThread = async () => {
         try {
-            await createThread();
+            const newThreadId = await createThread();
+            onSelectThread(newThreadId);
             fetchThreadsMemoized();
         } catch (error) {
             console.error('Failed to create a new thread:', error);
