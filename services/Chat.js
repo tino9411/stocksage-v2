@@ -33,20 +33,33 @@ class Chat extends EventEmitter {
             if (!mainAssistant) {
                 throw new Error('Main assistant not found in database');
             }
-
+    
             const thread = await this.client.beta.threads.create();
             this.setCurrentThreadId(thread.id);
-
+    
             // Create a new Thread document in the database
             const newThread = await Thread.create({
                 threadId: thread.id,
                 user: userId,
                 messages: []
             });
-
+    
             return thread.id;
         } catch (error) {
             console.error('Failed to create thread:', error);
+            throw error;
+        }
+    }
+
+    async createNewThread(subAssistantName) {
+        try {
+            const thread = await this.client.beta.threads.create({ 
+                metadata: { subAssistant: subAssistantName } 
+            });
+            this.subAssistantThreads[subAssistantName] = thread.id;
+            return thread.id;
+        } catch (error) {
+            console.error(`Failed to create new thread for Sub-assistant ${subAssistantName}:`, error);
             throw error;
         }
     }

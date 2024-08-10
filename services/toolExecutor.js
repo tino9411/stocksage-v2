@@ -41,27 +41,29 @@ class ToolExecutor {
     }
 
     async messageSubAssistant(subAssistantName, message) {
-        console.log(`Messaging Sub-assistant: ${subAssistantName}`);
-        let subAssistant = this.subAssistants[subAssistantName];
-        if (!subAssistant) {
-            subAssistant = await this.getOrCreateSubAssistant(subAssistantName);
-        }
-        
-        let threadId = this.chat.subAssistantThreads[subAssistantName];
-        if (!threadId) {
-            threadId = await this.chat.createNewThread(subAssistantName);
-        }
-        
-        const formattedMessage = this.formatMessage(message, subAssistant);
-        try {
-            const response = await subAssistant.processMessage(formattedMessage, threadId);
-            console.log(`Received response from Sub-assistant ${subAssistantName}:`, response);
-            return response;
-        } catch (error) {
-            console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
-            return `Error: Unable to process message. ${error.message}`;
-        }
+    console.log(`Messaging Sub-assistant: ${subAssistantName}`);
+    let subAssistant = this.subAssistants[subAssistantName];
+    if (!subAssistant) {
+        subAssistant = await this.getOrCreateSubAssistant(subAssistantName);
     }
+    
+    let threadId = this.chat.subAssistantThreads[subAssistantName];
+    if (!threadId) {
+        // Change this line
+        threadId = await this.chat.createNewThread();
+        this.chat.subAssistantThreads[subAssistantName] = threadId;
+    }
+    
+    const formattedMessage = this.formatMessage(message, subAssistant);
+    try {
+        const response = await subAssistant.processMessage(formattedMessage, threadId);
+        console.log(`Received response from Sub-assistant ${subAssistantName}:`, response);
+        return response;
+    } catch (error) {
+        console.error(`Error processing message with sub-assistant ${subAssistantName}:`, error);
+        return `Error: Unable to process message. ${error.message}`;
+    }
+}
 
     async getOrCreateSubAssistant(subAssistantName) {
         const savedAssistant = await Assistant.findOne({ name: subAssistantName });
