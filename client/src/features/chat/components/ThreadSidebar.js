@@ -49,7 +49,7 @@ function ThreadSidebar({ onSelectThread, selectedThreadId }) {
     };
 
     const getThreadTitle = (threadId) => {
-        return `${threadId.slice(0, 29)}...`;
+        return `${threadId.slice(0, 27)}...`;
     };
 
     return (
