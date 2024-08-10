@@ -37,6 +37,7 @@ export const ChatBox = styled(Box)(({ theme }) => ({
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
   padding: theme.spacing(2),
+  width: "50%"
 }));
 
 // Styled text field for message input
@@ -101,69 +102,4 @@ export const ScrollToBottomFab = styled(Fab)(({ theme }) => ({
   position: 'absolute',
   bottom: theme.spacing(2),
   right: theme.spacing(2),
-}));
-
-export const ThreadSidebar = styled(Box)(({ theme }) => ({
-  width: '250px',
-  height: '100%',
-  backgroundColor: '#2e2e2e',
-  color: '#ffffff',
-  padding: theme.spacing(2),
-  overflowY: 'auto',
-  display: 'flex',
-  flexDirection: 'column',
-  '&::-webkit-scrollbar': {
-    width: '8px',
-  },
-  '&::-webkit-scrollbar-thumb': {
-    backgroundColor: '#4a4a4a',
-    borderRadius: '4px',
-  },
-  '&::-webkit-scrollbar-thumb:hover': {
-    backgroundColor: '#5a5a5a',
-  },
-  '&::-webkit-scrollbar-track': {
-    backgroundColor: 'transparent',
-  },
-}));
-
-export const ThreadList = styled(List)({
-  flexGrow: 1,
-  overflow: 'auto',
-  padding: 0,
-});
-
-export const ThreadListItem = styled(ListItem)(({ theme, selected }) => ({
-  borderRadius: theme.spacing(1),
-  marginBottom: theme.spacing(1),
-  backgroundColor: selected ? '#4a4a4a' : 'transparent',
-  '&:hover': {
-    backgroundColor: '#3a3a3a',
-  },
-}));
-
-export const CreateThreadButton = styled(Fab)(({ theme }) => ({
-  position: 'absolute',
-  bottom: theme.spacing(2),
-  right: theme.spacing(2),
-  backgroundColor: '#007bff',
-  color: '#ffffff',
-  '&:hover': {
-    backgroundColor: '#0056b3',
-  },
-}));
-
-export const ThreadSidebarHeader = styled(Box)({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  marginBottom: '16px',
-});
-
-export const StyledThreadButton = styled(Button)(({ theme }) => ({
-  color: '#ffffff',
-  borderColor: '#ffffff',
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
 }));
