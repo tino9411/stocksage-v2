@@ -1,13 +1,19 @@
-// client/src/features/chat/components/InputArea.js
+// stocksage-v2/client/src/features/chat/components/InputArea.js
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import SendIcon from '@mui/icons-material/Send';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
 import ClearIcon from '@mui/icons-material/Clear';
 import { useChatState } from '../hooks/useChatState';
-import { InputArea, StyledTextField, StyledButton, FullWidthBox } from '../styles/chatStyles';
-import { Popper, Paper, Typography, ClickAwayListener, IconButton, Box, CircularProgress, Snackbar, Alert } from '@mui/material';
-import { styled } from '@mui/system';
+import { 
+  InputArea, 
+  StyledTextField, 
+  StyledButton, 
+  FullWidthBox,
+  CommandPopper,
+  CommandItem
+} from '../styles/chatStyles';
+import { Paper, Typography, ClickAwayListener, IconButton, Box, CircularProgress, Snackbar, Alert } from '@mui/material';
 import FilePreviewComponent from './FilePreviewComponent';
 import { debounce } from 'lodash';
 
@@ -30,43 +36,6 @@ const commands = [
   { command: '/ownership', description: 'Provide information about major ownership of a stock' },
   { command: '/technicals', description: 'Provide technical analysis for a stock' },
 ];
-
-const CommandPopper = styled(Popper)(({ theme }) => ({
-  zIndex: 1300,
-  width: 'calc(100% - 32px)',
-  maxWidth: '350px',
-  marginBottom: '10px',
-  '& .MuiPaper-root': {
-    backgroundColor: '#373944',
-    color: theme.palette.text.primary,
-    borderRadius: '0px',
-    maxHeight: '200px',
-    overflowY: 'auto',
-    border: `2px solid ${theme.palette.divider}`,
-    '&::-webkit-scrollbar': {
-      width: '4px',
-    },
-    '&::-webkit-scrollbar-thumb': {
-      backgroundColor: theme.palette.divider,
-      borderRadius: '4px',
-    },
-    '&::-webkit-scrollbar-thumb:hover': {
-      backgroundColor: theme.palette.text.secondary,
-    },
-    '&::-webkit-scrollbar-track': {
-      backgroundColor: 'transparent',
-    },
-  },
-}));
-
-const CommandItem = styled('div')(({ theme, isSelected }) => ({
-  padding: '6px 12px',
-  cursor: 'pointer',
-  backgroundColor: isSelected ? 'rgba(255, 255, 255, 0.1)' : 'transparent',
-  '&:hover': {
-    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-  },
-}));
 
 function InputAreaComponent() {
   const [input, setInput] = useState('');

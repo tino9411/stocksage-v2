@@ -1,55 +1,18 @@
+// stocksage-v2/client/src/features/chat/components/FormattedMessage.js
+
 import React, { useState, useEffect, useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Typography, Table, TableBody, TableCell, TableHead, TableRow, Box, Link, Button } from '@mui/material';
-import { styled, keyframes } from '@mui/system';
+import { Typography, TableBody, TableCell, TableHead, TableRow, Box, Link, Button } from '@mui/material';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
 import CopyButton from './ui/CopyButton';
-
-const StyledTable = styled(Table)(({ theme }) => ({
-  marginBottom: theme.spacing(2),
-  '& th, & td': {
-    borderColor: '#4d4d4d',
-    padding: theme.spacing(1),
-    fontSize: '0.875rem',
-  },
-}));
-
-const CodeHeader = styled(Box)(({ theme }) => ({
-  display: 'flex',
-  justifyContent: 'space-between',
-  alignItems: 'center',
-  padding: theme.spacing(1),
-  backgroundColor: theme.palette.grey[800],
-  borderTopLeftRadius: theme.shape.borderRadius,
-  borderTopRightRadius: theme.shape.borderRadius,
-}));
-
-const CodeBlock = styled(Box)(({ theme }) => ({
-  margin: 0,
-  padding: 0,
-  overflow: 'auto',
-  borderRadius: '4px',
-  '& pre': {
-    margin: 0,
-    padding: '16px',
-    overflowX: 'auto',
-    '&::-webkit-scrollbar': {
-      width: '8px',
-    },
-    '&::-webkit-scrollbar-thumb': {
-      backgroundColor: theme.palette.divider,
-      borderRadius: '4px',
-    },
-    '&::-webkit-scrollbar-thumb:hover': {
-      backgroundColor: theme.palette.text.secondary,
-    },
-    '&::-webkit-scrollbar-track': {
-      backgroundColor: 'transparent',
-    },
-  },
-}));
+import {
+  StyledTable,
+  CodeHeader,
+  CodeBlock,
+  BlinkingCursor
+} from '../styles/chatStyles';
 
 const FileLink = ({ href, children }) => {
   const fileId = href.split('/').pop();
@@ -69,18 +32,6 @@ const FileLink = ({ href, children }) => {
     </Button>
   );
 };
-
-const blink = keyframes`
-  0% { opacity: 1; }
-  50% { opacity: 0; }
-  100% { opacity: 1; }
-`;
-
-const BlinkingCursor = styled('span')({
-  animation: `${blink} 1s step-end infinite`,
-  display: 'inline-block',
-  marginLeft: '1px',
-});
 
 const FormattedMessage = ({ content, isStreaming }) => {
   console.log(`FormattedMessage rendering, content length: ${content.length}, isStreaming: ${isStreaming}`);

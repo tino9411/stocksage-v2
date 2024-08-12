@@ -111,132 +111,124 @@ export const useChat = (
     }
   }, []);
 
-  const finalizeMessage = useCallback(async () => {
-    setMessages(prev => {
-      const lastMessage = prev[prev.length - 1];
-      return [
-        ...prev.slice(0, -1),
-        { ...lastMessage, text: currentMessageRef.current, isStreaming: false }
-      ];
-    });
+  const finalizeMessage = useCallback(() => {
     setIsStreaming(false);
     closeEventSource();
 
-    // Save the message to the database
-    try {
-      if (!currentThreadIdRef.current) {
-        throw new Error('No active thread to save message');
-      }
-      await chatApi.saveMessage(currentThreadIdRef.current, {
-        role: 'assistant',
-        content: currentMessageRef.current
-      });
-      addLog('Message saved to database');
-    } catch (error) {
-      console.error('Error saving message to database:', error);
-      addLog(`Error saving message to database: ${error.message}`);
-    }
+    setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        return [
+            ...prev.slice(0, -1),
+            {
+                ...lastMessage,
+                text: currentMessageRef.current,
+                isStreaming: false,
+            }
+        ];
+    });
 
-    // Reset the current message
-    currentMessageRef.current = '';
-  }, [setMessages, closeEventSource, addLog]);
+    // Do not reset currentMessageRef.current here, as it should be reset at the start of a new stream
+}, [setMessages, closeEventSource, setIsStreaming]);
 
   const sendMessage = useCallback(async (input) => {
     if (input.trim() || uploadedFiles.length > 0) {
-      let threadId;
-      
-      try {
-        threadId = await ensureThreadExists();
-        currentThreadIdRef.current = threadId;
-        addLog(`Using thread: ${threadId}`);
-      } catch (error) {
-        console.error('Error ensuring thread exists:', error);
-        addLog(`Error ensuring thread exists: ${error.message}`);
-        setMessages(prev => [
-          ...prev, 
-          { 
-            id: Date.now(), 
-            text: `Error: Failed to create or switch to a thread. Please try again.`, 
-            sender: 'assistant',
-            threadId: null
-          }
-        ]);
-        return;
-      }
-
-      const newMessages = [];
-      
-      if (uploadedFiles.length > 0) {
-        newMessages.push({
-          id: Date.now(),
-          type: 'files',
-          files: uploadedFiles,
-          sender: 'user',
-          threadId: threadId
-        });
-      }
-      
-      if (input.trim()) {
-        newMessages.push({
-          id: Date.now() + 1,
-          text: input,
-          sender: 'user',
-          threadId: threadId
-        });
-      }
-      
-      newMessages.push({
-        id: Date.now() + 2,
-        text: '',
-        sender: 'assistant',
-        isStreaming: true,
-        threadId: threadId
-      });
-
-      setMessages(prev => [...prev, ...newMessages]);
-      addLog(`Sending message: ${input}`);
-
-      try {
-        setIsStreaming(true);
-        setToolCalls([]);
-        setIsToolCallInProgress(false);
-        setPendingToolCalls(0);
-        setIsWaitingForToolCompletion(false);
-
-        console.log('Sending message to API:', input);
-        const response = await chatApi.sendMessage(threadId, input);
-        console.log('API response:', response);
-
-        if (!response) {
-          throw new Error('No response received from the server');
-        }
-        if (!response.message || response.message !== 'Message received') {
-          throw new Error(`Unexpected response from server: ${JSON.stringify(response)}`);
+        let threadId;
+        
+        try {
+            threadId = await ensureThreadExists();
+            currentThreadIdRef.current = threadId;
+            addLog(`Using thread: ${threadId}`);
+        } catch (error) {
+            console.error('Error ensuring thread exists:', error);
+            addLog(`Error ensuring thread exists: ${error.message}`);
+            setMessages(prev => [
+                ...prev, 
+                { 
+                    id: Date.now(), 
+                    text: `Error: Failed to create or switch to a thread. Please try again.`, 
+                    sender: 'assistant',
+                    threadId: null
+                }
+            ]);
+            return;
         }
 
-        setupEventSource('/api/chat/stream');
-      } catch (error) {
-        console.error('Detailed error in sendMessage:', error);
-        setMessages(prev => [
-          ...prev, 
-          { 
-            id: Date.now(), 
-            text: `Error: ${error.message}. Please try again.`, 
+        // Reset the current message buffer before starting a new stream
+        currentMessageRef.current = '';
+
+        const newMessages = [];
+        
+        if (uploadedFiles.length > 0) {
+            newMessages.push({
+                id: Date.now(),
+                type: 'files',
+                files: uploadedFiles,
+                sender: 'user',
+                threadId: threadId
+            });
+        }
+        
+        if (input.trim()) {
+            newMessages.push({
+                id: Date.now() + 1,
+                text: input,
+                sender: 'user',
+                threadId: threadId
+            });
+        }
+        
+        newMessages.push({
+            id: Date.now() + 2,
+            text: '',
             sender: 'assistant',
+            isStreaming: true,
             threadId: threadId
-          }
-        ]);
-        handleStreamError();
-      } finally {
-        setIsStreaming(false);
-      }
-      
-      setUploadedFiles([]);
+        });
+
+        setMessages(prev => [...prev, ...newMessages]);
+        addLog(`Sending message: ${input}`);
+
+        try {
+            setIsStreaming(true);
+            setToolCalls([]);
+            setIsToolCallInProgress(false);
+            setPendingToolCalls(0);
+            setIsWaitingForToolCompletion(false);
+
+            console.log('Sending message to API:', input);
+            const response = await chatApi.sendMessage(threadId, input);
+            console.log('API response:', response);
+
+            if (!response) {
+                throw new Error('No response received from the server');
+            }
+            if (!response.message || response.message !== 'Message received') {
+                throw new Error(`Unexpected response from server: ${JSON.stringify(response)}`);
+            }
+
+            setupEventSource('/api/chat/stream');
+        } catch (error) {
+            console.error('Detailed error in sendMessage:', error);
+            setMessages(prev => [
+                ...prev, 
+                { 
+                    id: Date.now(), 
+                    text: `Error: ${error.message}. Please try again.`, 
+                    sender: 'assistant',
+                    threadId: threadId
+                }
+            ]);
+            handleStreamError();
+        } finally {
+            setIsStreaming(false);
+        }
+        
+        setUploadedFiles([]);
     } else {
-      addLog('Attempted to send empty message');
-      console.warn('Attempted to send message with no content and no files');
+        addLog('Attempted to send empty message');
+        console.warn('Attempted to send message with no content and no files');
     }
-  }, [
+}, [
     uploadedFiles,
     addLog,
     setIsStreaming,
@@ -249,7 +241,7 @@ export const useChat = (
     setupEventSource,
     ensureThreadExists,
     handleStreamError
-  ]);
+]);
 
   return {
     isStreaming,
