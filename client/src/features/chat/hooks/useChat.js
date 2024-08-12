@@ -65,14 +65,19 @@ export const useChat = (
   const handleToolCallCreated = useCallback((event) => {
     const data = JSON.parse(event.data);
     console.log('Tool call created:', data);
-    addLog(`Tool call created: ${data.function.name}`);
+    addLog(`Tool call created: ${data.type}`);
     const newToolCall = {
       id: data.id,
       threadId: currentThreadIdRef.current,
-      function: {
+      type: data.type,
+      function: data.function ? {
         name: data.function.name,
         arguments: data.function.arguments
-      },
+      } : null,
+      code_interpreter: data.code_interpreter ? {
+        input: data.code_interpreter.input,
+        outputs: data.code_interpreter.outputs
+      } : null,
       output: null
     };
     setToolCalls(prev => [...prev, newToolCall]);
@@ -83,17 +88,28 @@ export const useChat = (
   const handleToolCallDelta = useCallback((event) => {
     const data = JSON.parse(event.data);
     console.log('Tool call delta:', data);
-    if (data.delta.function && data.delta.function.arguments) {
-      setToolCalls(prev => prev.map(call =>
-        call.id === data.id ? { 
-          ...call, 
-          function: { 
-            ...call.function, 
-            arguments: call.function.arguments + data.delta.function.arguments 
-          } 
-        } : call
-      ));
-    }
+    setToolCalls(prev => prev.map(call => {
+      if (call.id === data.id) {
+        if (data.delta.function) {
+          return {
+            ...call,
+            function: {
+              ...call.function,
+              arguments: (call.function?.arguments || '') + (data.delta.function.arguments || '')
+            }
+          };
+        } else if (data.delta.code_interpreter) {
+          return {
+            ...call,
+            code_interpreter: {
+              ...call.code_interpreter,
+              input: (call.code_interpreter?.input || '') + (data.delta.code_interpreter.input || '')
+            }
+          };
+        }
+      }
+      return call;
+    }));
   }, [setToolCalls]);
 
   const handleToolCallCompleted = useCallback((event) => {
