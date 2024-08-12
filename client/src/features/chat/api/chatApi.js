@@ -1,4 +1,4 @@
-import axiosInstance from '../../../axiosConfig';
+import axiosInstance from '../../../utils/axiosConfig';
 
 const handleResponse = (response) => {
   if (response.status >= 200 && response.status < 300) {

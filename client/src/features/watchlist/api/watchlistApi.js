@@ -1,4 +1,4 @@
-import axiosInstance from '../../../axiosConfig';
+import axiosInstance from '../../../utils/axiosConfig';
 
 export const watchlistApi = {
   fetchWatchlist: async () => {
