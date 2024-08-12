@@ -1,3 +1,4 @@
+// Chat.js
 import React, { useState, useEffect } from 'react';
 import { useChatState } from '../hooks/useChatState';
 import ChatHeader from './ChatHeader';
@@ -5,8 +6,14 @@ import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
 import ThreadSidebar from './ThreadSidebar';
-import { ChatContainer, ChatBox, ChatLayout } from '../styles/chatStyles';
-import { Typography} from '@mui/material';
+import { 
+  ChatContainer, 
+  ChatLayout, 
+  ChatBox, 
+  MessageList as StyledMessageList,
+  InputArea as StyledInputArea
+} from '../styles/chatStyles';
+import { Typography, Box } from '@mui/material';
 
 function Chat() {
   const {
@@ -15,12 +22,23 @@ function Chat() {
     sendMessage,
     endChat,
     switchThread,
-    logs,
     isThreadCreated,
-    threads, // Add this to get access to the threads state
+    threads,
+    messages,
+    loadInitialMessages,
   } = useChatState();
 
   const [error, setError] = useState(null);
+
+  useEffect(() => {
+    if (currentThreadId) {
+      loadInitialMessages();
+    }
+  }, [currentThreadId, loadInitialMessages]);
+
+  useEffect(() => {
+    console.log("Messages in Chat component:", messages);
+  }, [messages]);
 
   const handleCreateThread = async () => {
     try {
@@ -31,7 +49,6 @@ function Chat() {
       }
     } catch (err) {
       setError("Failed to create a new chat thread. Please try again.");
-    } finally {
     }
   };
 
@@ -81,7 +98,7 @@ function Chat() {
         <ThreadSidebar 
           onSelectThread={handleThreadSelect} 
           onCreateThread={handleCreateThread}
-          threads={threads} // Pass threads to ThreadSidebar
+          threads={threads}
           selectedThreadId={currentThreadId}
         />
         <ChatBox>
@@ -89,17 +106,21 @@ function Chat() {
             onEndChat={handleEndChat} 
             currentThreadId={currentThreadId}
           />
-          {isThreadCreated ? (
-            <>
-              <MessageList />
-              <ToolCallHandler />
-              <InputArea onSendMessage={handleSendMessage} />
-            </>
-          ) : (
-            <Typography variant="body1" align="center">
-              Please create or select a thread to start chatting.
-            </Typography>
-          )}
+          <StyledMessageList>
+            {isThreadCreated ? (
+              <>
+                <MessageList messages={messages} currentThreadId={currentThreadId} />
+                <ToolCallHandler />
+              </>
+            ) : (
+              <Typography variant="body1" align="center">
+                Please create or select a thread to start chatting.
+              </Typography>
+            )}
+          </StyledMessageList>
+          <StyledInputArea>
+            <InputArea onSendMessage={handleSendMessage} />
+          </StyledInputArea>
         </ChatBox>
       </ChatLayout>
     </ChatContainer>

@@ -1,11 +1,12 @@
 import { styled } from '@mui/system';
-import { Box, TextField, Button, Fab, List, ListItem } from '@mui/material';
+import { Box, TextField, Button, Fab } from '@mui/material';
 
 // Container for the entire chat interface
 export const ChatContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   height: '100vh',
+  maxWidth: "1500px",
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
   alignItems: 'center',
@@ -22,7 +23,7 @@ export const ChatLayout = styled(Box)({
 
 // Sidebar for displaying threads
 export const Sidebar = styled(Box)({
-  width: '300px',
+  width: '250px',
   backgroundColor: '#2e2e2e',
   color: 'white',
   padding: '10px',
@@ -89,17 +90,33 @@ export const MessageList = styled(Box)(({ theme }) => ({
   },
 }));
 
-// Container for the input area
 export const InputArea = styled(Box)(({ theme }) => ({
+  width: '90%',
   padding: theme.spacing(2),
-  borderTop: `1px solid ${theme.palette.divider}`,
   display: 'flex',
-  alignItems: 'flex-end',
+  alignItems: 'center', // Changed from 'flex-end' to 'center'
+  justifyContent: 'center', // Added to center the content horizontally
+  boxSizing: 'border-box',
+  margin: '0 auto', // Added to center the InputArea itself
 }));
+
+export const FullWidthBox = styled(Box)({
+  display: 'flex',
+  width: '100%',
+});
 
 // Floating action button for scrolling to the bottom of the chat
 export const ScrollToBottomFab = styled(Fab)(({ theme }) => ({
   position: 'absolute',
   bottom: theme.spacing(2),
   right: theme.spacing(2),
+}));
+
+// New styles moved from ChatHeader.js
+export const Header = styled('div')(({ theme }) => ({
+  padding: theme.spacing(2),
+  borderBottom: `1px solid ${theme.palette.divider}`,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
 }));

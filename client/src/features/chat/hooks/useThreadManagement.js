@@ -1,3 +1,4 @@
+// useThreadManagement.js
 import { useState, useCallback, useEffect } from 'react';
 import * as chatApi from '../api/chatApi';
 import { useUser } from '../../../contexts/UserContext';
@@ -5,7 +6,7 @@ import { useUser } from '../../../contexts/UserContext';
 export const useThreadManagement = () => {
   const [threads, setThreads] = useState([]);
   const [isThreadCreated, setIsThreadCreated] = useState(false);
-  const [currentThreadId, setCurrentThreadId] = useState(null);
+  const [currentThreadId, setCurrentThreadId] = useState(() => localStorage.getItem('currentThreadId') || null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [messages, setMessages] = useState([]);
   const { user } = useUser();
@@ -34,35 +35,16 @@ export const useThreadManagement = () => {
       const response = await chatApi.createThread();
       const newThreadId = response.threadId;
       setCurrentThreadId(newThreadId);
+      localStorage.setItem('currentThreadId', newThreadId);
       setIsThreadCreated(true);
       setThreads(prevThreads => [...prevThreads, { threadId: newThreadId, createdAt: new Date() }]);
+      setMessages([]);
       return newThreadId;
     } catch (error) {
       console.error('Error creating thread:', error);
       throw error;
     }
   }, []);
-
-  const sendMessage = useCallback(async (input) => {
-    if (!isThreadCreated || !currentThreadId) {
-      try {
-        await createThread();
-      } catch (error) {
-        console.error('Error creating thread before sending message:', error);
-        throw error;
-      }
-    }
-    try {
-      const response = await chatApi.sendMessage(currentThreadId, input);
-      setMessages(prevMessages => [...prevMessages, { id: Date.now(), text: input, sender: 'user' }]);
-      if (response.message) {
-        setMessages(prevMessages => [...prevMessages, { id: Date.now(), text: response.message, sender: 'assistant' }]);
-      }
-    } catch (error) {
-      console.error('Error sending message:', error);
-      throw error;
-    }
-  }, [isThreadCreated, currentThreadId, createThread]);
 
   const endChat = useCallback(async () => {
     if (!currentThreadId) {
@@ -72,9 +54,9 @@ export const useThreadManagement = () => {
       await chatApi.endChat(currentThreadId);
       setThreads(prevThreads => prevThreads.filter(thread => thread.threadId !== currentThreadId));
       setCurrentThreadId(null);
+      localStorage.removeItem('currentThreadId');
       setIsThreadCreated(false);
       setMessages([]);
-      // Trigger a re-fetch of threads to ensure UI is up-to-date
       fetchThreads();
     } catch (error) {
       console.error('Error ending chat:', error);
@@ -82,17 +64,54 @@ export const useThreadManagement = () => {
     }
   }, [currentThreadId, fetchThreads]);
 
+  const loadInitialMessages = useCallback(async () => {
+    console.log('Loading initial messages for thread:', currentThreadId);
+    if (currentThreadId) {
+      try {
+        const threadMessages = await chatApi.getThreadMessages(currentThreadId);
+        console.log('Received messages from API:', threadMessages);
+        const formattedMessages = threadMessages.map(msg => ({
+          id: msg._id,
+          text: msg.content,
+          sender: msg.role,
+          threadId: currentThreadId,
+          timestamp: new Date(msg.timestamp)
+        }));
+        console.log('Formatted messages:', formattedMessages);
+        setMessages(formattedMessages);
+      } catch (error) {
+        console.error('Error loading initial messages:', error);
+      }
+    }
+  }, [currentThreadId]);
+
   const switchThread = useCallback(async (threadId) => {
     try {
       setCurrentThreadId(threadId);
+      localStorage.setItem('currentThreadId', threadId);
       setIsThreadCreated(true);
-      const threadMessages = await chatApi.getThreadMessages(threadId);
-      setMessages(threadMessages);
+      await loadInitialMessages();
     } catch (error) {
       console.error('Error switching thread:', error);
       throw error;
     }
-  }, []);
+  }, [loadInitialMessages]);
+
+  useEffect(() => {
+    if (currentThreadId) {
+      loadInitialMessages();
+    }
+  }, [currentThreadId, loadInitialMessages]);
+
+  // New function to ensure a thread exists
+  const ensureThreadExists = useCallback(async () => {
+    if (!isThreadCreated || !currentThreadId) {
+      const newThreadId = await createThread();
+      await switchThread(newThreadId);
+      return newThreadId;
+    }
+    return currentThreadId;
+  }, [isThreadCreated, currentThreadId, createThread, switchThread]);
 
   return {
     threads,
@@ -100,11 +119,13 @@ export const useThreadManagement = () => {
     createThread,
     isThreadCreated,
     currentThreadId,
-    sendMessage,
     endChat,
     switchThread,
     messages,
+    setMessages,
     uploadedFiles,
     setUploadedFiles,
+    loadInitialMessages,
+    ensureThreadExists, // New function exposed
   };
 };

@@ -1,3 +1,4 @@
+// ChatProvider.js
 import React, { useMemo } from 'react';
 import ChatContext from './ChatContext';
 import { useMessageHandling } from '../hooks/useMessageHandling';
@@ -12,8 +13,6 @@ export const ChatProvider = ({ children }) => {
   const { logs, addLog, addServerLogs } = useLogging();
   
   const {
-    messages,
-    setMessages,
     isStreaming,
     setIsStreaming,
     finalizeMessage,
@@ -41,6 +40,20 @@ export const ChatProvider = ({ children }) => {
     removeUploadedFile
   } = useFileHandling(addLog, addServerLogs);
 
+  const {
+    threads,
+    isThreadCreated,
+    currentThreadId,
+    createThread,
+    endChat,
+    switchThread,
+    deleteThread,
+    loadInitialMessages,
+    messages,
+    setMessages,
+    ensureThreadExists // New function
+  } = useThreadManagement();
+
   const { setupEventSource, closeEventSource, eventSourceRef } = useEventSource(
     addLog,
     setIsToolCallInProgress,
@@ -50,16 +63,6 @@ export const ChatProvider = ({ children }) => {
     finalizeMessage,
     handleStreamError
   );
-
-  const {
-    threads,
-    isThreadCreated,
-    currentThreadId,
-    createThread,
-    endChat,
-    switchThread,
-    deleteThread
-  } = useThreadManagement();
 
   const { sendMessage } = useMessageSending(
     uploadedFiles,
@@ -74,13 +77,12 @@ export const ChatProvider = ({ children }) => {
     setMessages,
     setUploadedFiles,
     setupEventSource,
-    isThreadCreated,
-    currentThreadId,
-    createThread
+    ensureThreadExists // Pass the new function instead of isThreadCreated, currentThreadId, createThread, and switchThread
   );
 
   const contextValue = useMemo(() => ({
     messages,
+    setMessages,
     currentThreadId,
     isThreadCreated,
     createThread,
@@ -102,8 +104,10 @@ export const ChatProvider = ({ children }) => {
     uploadingFiles,
     uploadedFiles,
     setUploadedFiles,
+    loadInitialMessages,
   }), [
-    messages, 
+    messages,
+    setMessages,
     currentThreadId,
     isThreadCreated,
     createThread, 
@@ -123,7 +127,8 @@ export const ChatProvider = ({ children }) => {
     uploadFile, 
     removeUploadedFile,
     uploadingFiles,
-    uploadedFiles
+    uploadedFiles,
+    loadInitialMessages,
   ]);
 
   return (

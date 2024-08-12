@@ -5,7 +5,7 @@ import { Typography, Table, TableBody, TableCell, TableHead, TableRow, Box, Link
 import { styled, keyframes } from '@mui/system';
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
 import { materialDark } from 'react-syntax-highlighter/dist/esm/styles/prism';
-import CopyButton from './CopyButton';
+import CopyButton from './ui/CopyButton';
 
 const StyledTable = styled(Table)(({ theme }) => ({
   marginBottom: theme.spacing(2),
@@ -70,10 +70,20 @@ const FileLink = ({ href, children }) => {
   );
 };
 
+const blink = keyframes`
+  0% { opacity: 1; }
+  50% { opacity: 0; }
+  100% { opacity: 1; }
+`;
+
+const BlinkingCursor = styled('span')({
+  animation: `${blink} 1s step-end infinite`,
+  display: 'inline-block',
+  marginLeft: '1px',
+});
+
 const FormattedMessage = ({ content, isStreaming }) => {
-
-  console.log(`FormattedMessage rendering, content length: ${content.length}`);
-
+  console.log(`FormattedMessage rendering, content length: ${content.length}, isStreaming: ${isStreaming}`);
 
   const components = useMemo(() => ({
     h1: (props) => <Typography variant="h5" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold' }} />,
@@ -127,7 +137,6 @@ const FormattedMessage = ({ content, isStreaming }) => {
     tr: TableRow,
     td: TableCell,
     th: (props) => <TableCell {...props} style={{ fontWeight: 'bold' }} />,
-
     img: ({ node, ...props }) => (
       <Box component="span" sx={{ display: 'block', maxWidth: '100%', margin: '1em 0' }}>
         <img style={{ maxWidth: '100%', height: 'auto' }} {...props} alt={props.alt || 'Generated image'} />
@@ -142,24 +151,17 @@ const FormattedMessage = ({ content, isStreaming }) => {
     },
   }), []);
 
-  const blink = keyframes`
-  0% { opacity: 1; }
-  50% { opacity: 0; }
-  100% { opacity: 1; }
-`;
-
-const BlinkingCursor = styled('span')({
-  animation: `${blink} 1s step-end infinite`,
-});
-
-
   return (
-    <>
+    <Box>
       <ReactMarkdown components={components} remarkPlugins={[remarkGfm]}>
         {content}
       </ReactMarkdown>
-      {isStreaming && <BlinkingCursor>▋</BlinkingCursor>}
-    </>
+      {isStreaming && (
+        <Typography component="span" variant="body1">
+          <BlinkingCursor>▋</BlinkingCursor>
+        </Typography>
+      )}
+    </Box>
   );
 };
 

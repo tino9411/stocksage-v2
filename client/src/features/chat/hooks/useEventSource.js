@@ -11,7 +11,16 @@ export const useEventSource = (
 ) => {
   const eventSourceRef = useRef(null);
 
+  const closeEventSource = useCallback(() => {
+    if (eventSourceRef.current) {
+      eventSourceRef.current.close();
+      eventSourceRef.current = null;
+    }
+  }, []);
+
   const setupEventSource = useCallback((url) => {
+    closeEventSource(); // Close any existing EventSource before creating a new one
+
     try {
       eventSourceRef.current = new EventSource(url);
     } catch (error) {
@@ -21,7 +30,12 @@ export const useEventSource = (
 
     eventSourceRef.current.onerror = (event) => {
       console.error('EventSource failed:', event);
-      handleStreamError();
+      if (typeof handleStreamError === 'function') {
+        handleStreamError();
+      } else {
+        console.error('handleStreamError is not a function');
+      }
+      closeEventSource();
     };
 
     eventSourceRef.current.onmessage = (event) => {
@@ -36,7 +50,7 @@ export const useEventSource = (
             ...prev.slice(0, -1),
             {
               ...lastMessage,
-              text: lastMessage.text + data.content,
+              text: (lastMessage?.text || '') + data.content,
               isStreaming: true
             }
           ];
@@ -77,20 +91,17 @@ export const useEventSource = (
     });
 
     eventSourceRef.current.addEventListener('end', () => {
-      if (setPendingToolCalls > 0) {
-        // This should be handled in the parent component
-      } else {
-        finalizeMessage();
-      }
+      setMessages(prev => {
+        const lastMessage = prev[prev.length - 1];
+        return [
+          ...prev.slice(0, -1),
+          { ...lastMessage, isStreaming: false }
+        ];
+      });
+      finalizeMessage();
+      closeEventSource();
     });
-  }, [addLog, setIsToolCallInProgress, setMessages, setToolCalls, setPendingToolCalls, finalizeMessage, handleStreamError]);
-
-  const closeEventSource = useCallback(() => {
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
-    }
-  }, []);
+  }, [addLog, setIsToolCallInProgress, setMessages, setToolCalls, setPendingToolCalls, finalizeMessage, handleStreamError, closeEventSource]);
 
   return { setupEventSource, closeEventSource, eventSourceRef };
 };

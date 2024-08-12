@@ -2,7 +2,7 @@ import { styled } from '@mui/system';
 import { Box, List, ListItem, Fab, IconButton, Typography, Button } from '@mui/material';
 
 export const ThreadSidebar = styled(Box)(({ theme }) => ({
-  width: '300px',
+  width: '250px',
   height: '100%',
   backgroundColor: '#2e2e2e',
   color: '#ffffff',

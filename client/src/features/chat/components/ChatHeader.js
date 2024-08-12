@@ -2,16 +2,8 @@ import React, { useState } from 'react';
 import { Typography, IconButton } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EndChatDialog from './EndChatDialog';
-import { styled } from '@mui/system';
 import CloseIcon from '@mui/icons-material/Close';
-
-const Header = styled('div')(({ theme }) => ({
-  padding: theme.spacing(2),
-  borderBottom: `1px solid ${theme.palette.divider}`,
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-}));
+import { Header } from '../styles/chatStyles';  // Import the Header component from chatStyles
 
 function ChatHeader({ onEndChat, currentThreadId, onBackClick }) {
   const [dialogOpen, setDialogOpen] = useState(false);

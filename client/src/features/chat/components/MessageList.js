@@ -1,6 +1,5 @@
 import React, { useRef, useEffect, useCallback } from 'react';
 import { List, ListItem, Box, Typography } from '@mui/material';
-import { useChatState } from '../hooks/useChatState';
 import MessageBubble from './MessageBubble';
 import { MessageList as StyledMessageList } from '../styles/chatStyles';
 import AttachFileIcon from '@mui/icons-material/AttachFile';
@@ -22,8 +21,7 @@ const FileItem = styled(Box)(({ theme }) => ({
   gap: theme.spacing(1),
 }));
 
-function MessageList() {
-  const { messages, isStreaming, currentThreadId } = useChatState();
+function MessageList({ messages, currentThreadId }) {
   const messagesEndRef = useRef(null);
 
   const scrollToBottom = useCallback(() => {
@@ -32,7 +30,12 @@ function MessageList() {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isStreaming, scrollToBottom]);
+  }, [messages, scrollToBottom]);
+
+  useEffect(() => {
+    console.log("Messages in MessageList:", messages);
+    console.log("Current Thread ID:", currentThreadId);
+  }, [messages, currentThreadId]);
 
   const formatFileSize = (bytes) => {
     if (isNaN(bytes) || bytes === 0) return '0 Bytes';
@@ -44,6 +47,12 @@ function MessageList() {
 
   // Filter messages for the current thread
   const currentThreadMessages = messages.filter(message => message.threadId === currentThreadId);
+
+  console.log("Rendering messages:", currentThreadMessages);
+
+  if (currentThreadMessages.length === 0) {
+    return <Typography>No messages in this thread yet.</Typography>;
+  }
 
   return (
     <StyledMessageList component={List}>
