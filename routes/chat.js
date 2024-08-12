@@ -93,7 +93,6 @@ router.get('/stream', async (req, res) => {
         sendSSE('ping', {});
     }, 15000);
 
-    let assistantResponse = '';
     const currentStoredMessage = { ...storedMessage };
 
     try {
@@ -103,11 +102,9 @@ router.get('/stream', async (req, res) => {
             switch (event.type) {
                 case 'textDelta':
                     sendSSE('message', { type: 'textDelta', content: event.data.value });
-                    assistantResponse += event.data.value;
                     break;
                 case 'textCreated':
                     sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });
-                    assistantResponse = event.data.content[0].text.value;
                     break;
                 case 'requiresAction':
                     sendSSE('requiresAction', { toolCalls: event.data });

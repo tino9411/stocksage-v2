@@ -276,23 +276,20 @@ class MainAssistant extends BaseAssistantService {
                 { assistant_id: mainAssistant.assistantId }
             );
     
-            await this.observeStream(stream, onEvent);
+            let assistantResponse = '';
+            await this.observeStream(stream, (event) => {
+                if (event.type === 'textDelta') {
+                    assistantResponse += event.data.value;
+                }
+                onEvent(event);
+            });
+
+            // Save both user message and assistant response
+            await this.saveMessages(threadId, userMessage, assistantResponse);
+
             const finalMessages = await stream.finalMessages();
             console.log('[streamMessage] Final messages:', finalMessages);
     
-            // Update the Thread document in the database
-            await Thread.findOneAndUpdate(
-                { threadId: threadId },
-                { 
-                    $push: { 
-                        messages: [
-                            { role: 'user', content: userMessage },
-                            ...finalMessages.map(msg => ({ role: msg.role, content: msg.content[0].text.value }))
-                        ] 
-                    },
-                    updatedAt: new Date()
-                }
-            );
         } catch (error) {
             console.error('[streamMessage] Error:', error);
             onEvent({ type: 'error', data: error.message });
@@ -332,13 +329,51 @@ class MainAssistant extends BaseAssistantService {
                 runId,
                 { tool_outputs: toolOutputs }
             );
-            await this.observeStream(stream, onEvent);
+
+            let assistantResponse = '';
+            await this.observeStream(stream, (event) => {
+                if (event.type === 'textDelta') {
+                    assistantResponse += event.data.value;
+                }
+                onEvent(event);
+            });
+
+            // Save the assistant's response after tool calls
+            await this.saveMessages(threadId, null, assistantResponse);
+
         } catch (error) {
             console.error('[handleToolCalls] Error handling tool calls:', error);
             onEvent({ type: 'error', data: error.message });
         }
     }
 
+    async saveMessages(threadId, userMessage, assistantResponse) {
+        try {
+            const thread = await Thread.findOne({ threadId: threadId });
+            if (!thread) {
+                throw new Error(`Thread not found: ${threadId}`);
+            }
+
+            const messagesToSave = [];
+
+            if (userMessage) {
+                messagesToSave.push({ role: 'user', content: userMessage });
+            }
+
+            if (assistantResponse) {
+                messagesToSave.push({ role: 'assistant', content: assistantResponse });
+            }
+
+            thread.messages.push(...messagesToSave);
+            await thread.save();
+
+            console.log(`[saveMessages] Saved ${messagesToSave.length} messages for thread ${threadId}`);
+        } catch (error) {
+            console.error(`[saveMessages] Error saving messages: ${error.message}`);
+            throw error;
+        }
+    }
+    
     async addFilesToConversation(threadId, files) {
         try {
             this.setCurrentThreadId(threadId);

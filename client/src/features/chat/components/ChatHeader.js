@@ -22,7 +22,6 @@ function ChatHeader({ onEndChat, currentThreadId, onBackClick }) {
       <IconButton edge="start" color="inherit" aria-label="back" onClick={onBackClick}>
         <ArrowBackIcon />
       </IconButton>
-      <Typography variant="h6">Stock Sage</Typography>
       {currentThreadId && (
         <IconButton color="inherit" onClick={handleEndChat}>
           <CloseIcon />
