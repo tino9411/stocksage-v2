@@ -27,14 +27,19 @@ const scrollbarStyles = {
 const ToolCallHandler = () => {
   const { toolCalls, isToolCallInProgress, currentThreadId } = useChatState();
 
-  // Filter tool calls for the current thread and remove entries without arguments
   const currentThreadToolCalls = useMemo(() => {
     return toolCalls
       .filter(call => call.threadId === currentThreadId)
-      .filter(call => call.function && call.function.arguments && call.function.arguments.trim() !== '');
+      .filter(call => {
+        if (call.type === 'function') {
+          return call.function && call.function.arguments && call.function.arguments.trim() !== '';
+        } else if (call.type === 'code_interpreter') {
+          return call.code_interpreter && call.code_interpreter.input && call.code_interpreter.input.trim() !== '';
+        }
+        return false;
+      });
   }, [toolCalls, currentThreadId]);
 
-  // Calculate pending tool calls
   const pendingToolCalls = useMemo(() => {
     return currentThreadToolCalls.filter(call => call.output === null).length;
   }, [currentThreadToolCalls]);
@@ -55,7 +60,39 @@ const ToolCallHandler = () => {
       return JSON.parse(jsonString);
     } catch (error) {
       console.error('Failed to parse JSON:', error);
-      return jsonString; // Return the original string if parsing fails
+      return jsonString;
+    }
+  };
+
+  const renderToolCall = (toolCall) => {
+    if (toolCall.type === 'function') {
+      return (
+        <>
+          <Typography variant="subtitle2" sx={{ color: '#4a9eff' }}>
+            Function: {toolCall.function.name}
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5, color: '#bbb' }}>
+            Arguments:
+            <Box sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+              <JSONPretty id={`json-pretty-${toolCall.id}`} data={safeJsonParse(toolCall.function.arguments)} />
+            </Box>
+          </Typography>
+        </>
+      );
+    } else if (toolCall.type === 'code_interpreter') {
+      return (
+        <>
+          <Typography variant="subtitle2" sx={{ color: '#4a9eff' }}>
+            Code Interpreter
+          </Typography>
+          <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5, color: '#bbb' }}>
+            Input:
+            <Box sx={{ maxWidth: '100%', overflowX: 'auto' }}>
+              <pre>{toolCall.code_interpreter.input}</pre>
+            </Box>
+          </Typography>
+        </>
+      );
     }
   };
 
@@ -86,15 +123,7 @@ const ToolCallHandler = () => {
               p: 1, 
               borderBottom: index < currentThreadToolCalls.length - 1 ? '1px solid #444' : 'none',
             }}>
-              <Typography variant="subtitle2" sx={{ color: '#4a9eff' }}>
-                Tool: {toolCall.function.name}
-              </Typography>
-              <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5, color: '#bbb' }}>
-                Arguments:
-                <Box sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-                  <JSONPretty id={`json-pretty-${toolCall.id}`} data={safeJsonParse(toolCall.function.arguments)} />
-                </Box>
-              </Typography>
+              {renderToolCall(toolCall)}
               {toolCall.output === null ? (
                 <Box>
                   <LinearProgress sx={{ mt: 1, height: 2, backgroundColor: '#444', '& .MuiLinearProgress-bar': { backgroundColor: '#4a9eff' } }} />

@@ -3,8 +3,8 @@ const mongoose = require('mongoose');
 const UserSchema = new mongoose.Schema({
   googleId: {
     type: String,
-    required: true,
-    unique: true
+    unique: true,
+    sparse: true
   },
   email: {
     type: String,
@@ -15,12 +15,16 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  password: {
+    type: String,
+    required: false // Changed from function() { return !this.googleId; }
+  },
   watchlist: [{
     type: String
   }],
   threads: [{
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'Thread' // Reference to the Thread model
+    ref: 'Thread'
   }]
 }, { timestamps: true });
 

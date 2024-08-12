@@ -10,6 +10,7 @@ const passport = require('./config/passport');
 const chatRouter = require('./routes/chat');
 const stockRoutes = require('./routes/stock');
 const userRoutes = require('./routes/user');
+const authRoutes = require('./routes/auth');
 const connectDB = require('./config/db');
 const MainAssistantService = require('./assistants/MainAssistant');
 const Stock = require('./services/StockService');
@@ -82,7 +83,7 @@ connectDB().then(async () => {
 app.use('/api/stocks', stockRoutes);
 app.use('/api/user', userRoutes);
 app.use('/api/chat', chatRouter);
-
+app.use('/api/auth', authRoutes);
 // Auth routes
 app.get('/auth/google',
     passport.authenticate('google', { scope: ['profile', 'email'] })
