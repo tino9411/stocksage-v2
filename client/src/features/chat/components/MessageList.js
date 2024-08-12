@@ -50,10 +50,6 @@ function MessageList({ messages, currentThreadId }) {
 
   console.log("Rendering messages:", currentThreadMessages);
 
-  if (currentThreadMessages.length === 0) {
-    return <Typography>No messages in this thread yet.</Typography>;
-  }
-
   return (
     <StyledMessageList component={List}>
       {currentThreadMessages.map((message, index) => (

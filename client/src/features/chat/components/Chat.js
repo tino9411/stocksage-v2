@@ -1,4 +1,3 @@
-// Chat.js
 import React, { useState, useEffect } from 'react';
 import { useChatState } from '../hooks/useChatState';
 import ChatHeader from './ChatHeader';
@@ -14,6 +13,8 @@ import {
   InputArea as StyledInputArea
 } from '../styles/chatStyles';
 import { Typography, Box } from '@mui/material';
+
+
 
 function Chat() {
   const {
@@ -114,7 +115,6 @@ function Chat() {
               </>
             ) : (
               <Typography variant="body1" align="center">
-                Please create or select a thread to start chatting.
               </Typography>
             )}
           </StyledMessageList>

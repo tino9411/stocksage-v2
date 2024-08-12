@@ -13,6 +13,27 @@ export const createThread = () =>
 export const sendMessage = (threadId, message) => 
   axiosInstance.post('/api/chat/stream/message', { threadId, message }).then(handleResponse);
 
+export const saveMessage = async (threadId, message) => {
+  try {
+    const response = await fetch(`/api/chat/thread/${threadId}/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      throw new Error('Failed to save message');
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error saving message:', error);
+    throw error;
+  }
+};
+
 export const uploadFile = (formData) => 
   axiosInstance.post('/api/chat/upload', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },

@@ -251,6 +251,42 @@ router.get('/thread/:threadId/messages', async (req, res) => {
       res.status(500).json({ error: "Failed to fetch thread messages" });
     }
   });
+
+  router.post('/thread/:threadId/messages', async (req, res) => {
+    try {
+      const { threadId } = req.params;
+      const { role, content } = req.body;
+      const userId = req.user.id; // Assuming you have user authentication middleware
+  
+      if (!threadId || !role || !content) {
+        return res.status(400).json({ error: "ThreadId, role, and content are required" });
+      }
+  
+      // Find the thread by threadId and userId
+      const thread = await Thread.findOne({ threadId, user: userId });
+      if (!thread) {
+        return res.status(404).json({ error: "Thread not found" });
+      }
+  
+      // Create a new message object
+      const newMessage = {
+        role,
+        content,
+        timestamp: new Date()
+      };
+  
+      // Add the new message to the thread's messages array
+      thread.messages.push(newMessage);
+  
+      // Save the updated thread
+      await thread.save();
+  
+      res.json({ message: "Message saved successfully", savedMessage: newMessage });
+    } catch (error) {
+      console.error('Error saving message:', error);
+      res.status(500).json({ error: "Failed to save message", details: error.message });
+    }
+  });
   
 
 router.delete('/thread/:threadId', async (req, res) => {
