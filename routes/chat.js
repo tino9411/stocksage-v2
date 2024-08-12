@@ -106,8 +106,14 @@ router.get('/stream', async (req, res) => {
                 case 'textCreated':
                     sendSSE('message', { type: 'textCreated', content: event.data.content[0].text.value });
                     break;
-                case 'requiresAction':
-                    sendSSE('requiresAction', { toolCalls: event.data });
+                case 'toolCallCreated':
+                    sendSSE('toolCallCreated', event.data);
+                    break;
+                case 'toolCallDelta':
+                    sendSSE('toolCallDelta', event.data);
+                    break;
+                case 'toolCallCompleted':
+                    sendSSE('toolCallCompleted', event.data);
                     break;
                 case 'end':
                     sendSSE('end', { content: 'Stream ended' });
@@ -119,6 +125,8 @@ router.get('/stream', async (req, res) => {
                     clearInterval(keepAlive);
                     res.end();
                     break;
+                default:
+                    console.log('Unhandled event type:', event.type);
             }
         });
     } catch (error) {

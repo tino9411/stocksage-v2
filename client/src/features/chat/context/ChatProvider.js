@@ -101,7 +101,8 @@ export const ChatProvider = ({ children }) => {
     setupEventSource,
     closeEventSource,
     finalizeMessage,
-    handleStreamError
+    handleStreamError,
+    pendingToolCalls
   }), [
     messages,
     setMessages,
@@ -130,7 +131,8 @@ export const ChatProvider = ({ children }) => {
     setupEventSource,
     closeEventSource,
     finalizeMessage,
-    handleStreamError
+    handleStreamError,
+    pendingToolCalls
   ]);
 
   return (

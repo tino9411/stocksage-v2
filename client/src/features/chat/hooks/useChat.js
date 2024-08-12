@@ -16,6 +16,8 @@ export const useChat = (
   const eventSourceRef = useRef(null);
   const currentMessageRef = useRef('');
   const currentThreadIdRef = useRef(null);
+  const currentToolCallRef = useRef(null);
+  const seenToolCallIdsRef = useRef(new Set());
 
   const setupEventSource = useCallback((url) => {
     if (eventSourceRef.current) {
@@ -31,15 +33,18 @@ export const useChat = (
 
     eventSourceRef.current.onmessage = (event) => {
       const data = JSON.parse(event.data);
+      console.log('Received event:', data);
       handleEventSourceMessage(data);
     };
 
     eventSourceRef.current.addEventListener('toolCallCreated', handleToolCallCreated);
+    eventSourceRef.current.addEventListener('toolCallDelta', handleToolCallDelta);
     eventSourceRef.current.addEventListener('toolCallCompleted', handleToolCallCompleted);
     eventSourceRef.current.addEventListener('end', handleEventSourceEnd);
   }, []);
 
   const handleEventSourceMessage = useCallback((data) => {
+    console.log('Handling event source message:', data);
     if (data.type === 'textDelta') {
       setIsToolCallInProgress(false);
       currentMessageRef.current += data.content;
@@ -59,24 +64,41 @@ export const useChat = (
 
   const handleToolCallCreated = useCallback((event) => {
     const data = JSON.parse(event.data);
-    addLog(`Tool call created: ${data.toolCall.function.name}`);
-    setToolCalls(prev => [
-      ...prev, 
-      { 
-        ...data.toolCall, 
-        function: {
-          ...data.toolCall.function,
-          arguments: JSON.stringify(data.toolCall.function.arguments)
-        },
-        output: null 
-      }
-    ]);
+    console.log('Tool call created:', data);
+    addLog(`Tool call created: ${data.function.name}`);
+    const newToolCall = {
+      id: data.id,
+      threadId: currentThreadIdRef.current,
+      function: {
+        name: data.function.name,
+        arguments: data.function.arguments
+      },
+      output: null
+    };
+    setToolCalls(prev => [...prev, newToolCall]);
     setIsToolCallInProgress(true);
     setPendingToolCalls(prev => prev + 1);
   }, [addLog, setToolCalls, setIsToolCallInProgress, setPendingToolCalls]);
 
+  const handleToolCallDelta = useCallback((event) => {
+    const data = JSON.parse(event.data);
+    console.log('Tool call delta:', data);
+    if (data.delta.function && data.delta.function.arguments) {
+      setToolCalls(prev => prev.map(call =>
+        call.id === data.id ? { 
+          ...call, 
+          function: { 
+            ...call.function, 
+            arguments: call.function.arguments + data.delta.function.arguments 
+          } 
+        } : call
+      ));
+    }
+  }, [setToolCalls]);
+
   const handleToolCallCompleted = useCallback((event) => {
     const data = JSON.parse(event.data);
+    console.log('Tool call completed:', data);
     addLog(`Tool call completed: ${data.id}`);
     setToolCalls(prev => prev.map(call =>
       call.id === data.id ? { 
@@ -84,8 +106,14 @@ export const useChat = (
         output: JSON.stringify(data.output) 
       } : call
     ));
-    setPendingToolCalls(prev => prev - 1);
-  }, [addLog, setToolCalls, setPendingToolCalls]);
+    setPendingToolCalls(prev => {
+      const newValue = Math.max(0, prev - 1);
+      if (newValue === 0) {
+        setIsToolCallInProgress(false);
+      }
+      return newValue;
+    });
+  }, [addLog, setToolCalls, setPendingToolCalls, setIsToolCallInProgress]);
 
   const handleEventSourceEnd = useCallback(() => {
     setMessages(prev => {
@@ -126,9 +154,10 @@ export const useChat = (
             }
         ];
     });
-
-    // Do not reset currentMessageRef.current here, as it should be reset at the start of a new stream
-}, [setMessages, closeEventSource, setIsStreaming]);
+    
+    setPendingToolCalls(0);
+    setIsToolCallInProgress(false);
+  }, [setMessages, closeEventSource, setIsStreaming, setPendingToolCalls, setIsToolCallInProgress]);
 
   const sendMessage = useCallback(async (input) => {
     if (input.trim() || uploadedFiles.length > 0) {
@@ -153,7 +182,6 @@ export const useChat = (
             return;
         }
 
-        // Reset the current message buffer before starting a new stream
         currentMessageRef.current = '';
 
         const newMessages = [];
@@ -228,7 +256,7 @@ export const useChat = (
         addLog('Attempted to send empty message');
         console.warn('Attempted to send message with no content and no files');
     }
-}, [
+  }, [
     uploadedFiles,
     addLog,
     setIsStreaming,
@@ -241,7 +269,7 @@ export const useChat = (
     setupEventSource,
     ensureThreadExists,
     handleStreamError
-]);
+  ]);
 
   return {
     isStreaming,
