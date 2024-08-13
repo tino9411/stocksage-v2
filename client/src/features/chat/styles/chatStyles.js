@@ -18,35 +18,57 @@ const scrollbarStyles = {
   },
 };
 
-// ChatContainer styles
 export const ChatContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   height: '100vh',
-  maxWidth: "1500px",
+  width: '1400px',  // Consistent fixed width
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
-  alignItems: 'center',
-  justifyContent: 'center',
+  overflow: 'hidden',
+  margin: '0 auto',  // Center the container horizontally
+  minWidth: '100%',  // Prevent overflow on smaller screens
+  maxWidth: '100%',  // Ensure it doesn't exceed 100% of the viewport width
 }));
 
-// ChatLayout styles
 export const ChatLayout = styled(Box)({
   display: 'flex',
   flexDirection: 'row',
   height: '100%',
   width: '100%',
+  overflow: 'hidden',
 });
 
-// ChatBox styles
-export const ChatBox = styled(Box)(({ theme }) => ({
+export const ChatBox = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isSidebarVisible',
+})(({ theme, isSidebarVisible }) => ({
   flexGrow: 1,
   display: 'flex',
   flexDirection: 'column',
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
   padding: theme.spacing(2),
-  width: "50%"
+  transition: 'width 0.3s ease-in-out',
+  width:'100%',
+  overflow: 'auto',
+}));
+
+// New SidebarToggleButton styles
+export const SidebarToggleButton = styled(Box, {
+  shouldForwardProp: (prop) => prop !== 'isSidebarVisible',
+})(({ theme, isSidebarVisible }) => ({
+  position: 'absolute',
+  right: isSidebarVisible ? '300px' : '0',
+  top: '50%',
+  transform: 'translateY(-50%)',
+  zIndex: 1200,
+  transition: 'right 0.3s ease-in-out',
+  backgroundColor: theme.palette.background.paper,
+  borderRadius: '50%',
+  boxShadow: theme.shadows[3],
+  '&:hover': {
+    backgroundColor: theme.palette.action.hover,
+  },
 }));
 
 // MessageList styles
@@ -56,7 +78,6 @@ export const MessageList = styled(Box)(({ theme }) => ({
   padding: theme.spacing(2),
   ...scrollbarStyles,
 }));
-
 
 // InputArea styles
 export const InputArea = styled(Box)(({ theme }) => ({
