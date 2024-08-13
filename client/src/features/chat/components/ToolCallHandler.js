@@ -101,9 +101,11 @@ const ToolCallHandler = () => {
   };
 
   return (
-    <Box sx={{ 
+    <Box sx={{
+      position: 'relative',
+      right: 55, // Position 10px from the left side
       mt: 1, 
-      mb: 1, 
+      mb: 1,
       maxWidth: '800px', 
       width: '100%',
       margin: '0 auto',

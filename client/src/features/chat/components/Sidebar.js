@@ -6,9 +6,9 @@ import { scrollbarStyles } from '../styles/chatStyles'; // Import scrollbarStyle
 
 const SidebarContainer = styled(Box)(({ theme, isVisible }) => ({
   position: 'fixed', // Use fixed positioning for overlapping
-  right: isVisible ? 10 : '-300px', // Move sidebar off-screen when hidden
+  right: isVisible ? 10 : '-500px', // Move sidebar off-screen when hidden
   top: 100,
-  width: '300px',
+  width: '500px',
   height: '80%',
   backgroundColor: '#3f4150',
   color: '#ffffff',
@@ -31,7 +31,7 @@ const Sidebar = ({ subAssistantMessages, isVisible }) => {
   return (
     <SidebarContainer isVisible={isVisible}>
       <Typography variant="h6" gutterBottom align="center">
-        Sub-Assistant Interactions
+        Sidebar
       </Typography>
       <Divider sx={{ marginBottom: 2 }} />
       {subAssistantMessages.length === 0 ? (

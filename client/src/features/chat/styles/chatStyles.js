@@ -48,9 +48,10 @@ export const ChatBox = styled(Box, {
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
   padding: theme.spacing(2),
-  transition: 'width 0.3s ease-in-out',
-  width:'100%',
   overflow: 'auto',
+  marginRight:'auto', // Shift the content left when the sidebar is visible
+  maxWidth:  '70%', // Set max-width for when sidebar is hidden
+  marginLeft: 'auto', // Center the chatbox when sidebar is not visible
 }));
 
 // New SidebarToggleButton styles
