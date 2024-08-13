@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useContext } from 'react';
 import { useChatState } from '../hooks/useChatState';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
@@ -12,9 +12,8 @@ import {
   MessageList as StyledMessageList,
   InputArea as StyledInputArea
 } from '../styles/chatStyles';
-import { Typography, Box } from '@mui/material';
-
-
+import { Typography } from '@mui/material';
+import ChatContext from '../context/ChatContext';
 
 function Chat() {
   const {
@@ -28,6 +27,8 @@ function Chat() {
     messages,
     loadInitialMessages,
   } = useChatState();
+
+  const { toolCalls, isToolCallInProgress } = useContext(ChatContext);  // Access context for tool calls state
 
   const [error, setError] = useState(null);
 
@@ -111,10 +112,11 @@ function Chat() {
             {isThreadCreated ? (
               <>
                 <MessageList messages={messages} currentThreadId={currentThreadId} />
-                <ToolCallHandler />
+                {(toolCalls.length > 0 || isToolCallInProgress) && <ToolCallHandler />}
               </>
             ) : (
               <Typography variant="body1" align="center">
+                No active thread. Please create or select a thread.
               </Typography>
             )}
           </StyledMessageList>
