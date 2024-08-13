@@ -67,19 +67,19 @@ export const useChat = (
     console.log('Tool call created:', data);
     addLog(`Tool call created: ${data.type}`);
     const newToolCall = {
-      id: data.id,
-      threadId: currentThreadIdRef.current,
-      type: data.type,
-      function: data.function ? {
-        name: data.function.name,
-        arguments: data.function.arguments
-      } : null,
-      code_interpreter: data.code_interpreter ? {
-        input: data.code_interpreter.input,
-        outputs: data.code_interpreter.outputs
-      } : null,
-      output: null
-    };
+        id: data.id,
+        threadId: currentThreadIdRef.current,
+        type: data.type || 'function',  // Ensure type is set correctly
+        function: data.function ? {
+          name: data.function.name,
+          arguments: data.function.arguments || ''
+        } : null,
+        code_interpreter: data.code_interpreter ? {
+          input: data.code_interpreter.input,
+          outputs: data.code_interpreter.outputs
+        } : null,
+        output: null
+      };
     setToolCalls(prev => [...prev, newToolCall]);
     setIsToolCallInProgress(true);
     setPendingToolCalls(prev => prev + 1);

@@ -28,16 +28,18 @@ const ToolCallHandler = () => {
   const { toolCalls, isToolCallInProgress, currentThreadId } = useChatState();
 
   const currentThreadToolCalls = useMemo(() => {
-    return toolCalls
-      .filter(call => call.threadId === currentThreadId)
-      .filter(call => {
-        if (call.type === 'function') {
-          return call.function && call.function.arguments && call.function.arguments.trim() !== '';
-        } else if (call.type === 'code_interpreter') {
-          return call.code_interpreter && call.code_interpreter.input && call.code_interpreter.input.trim() !== '';
-        }
-        return false;
-      });
+    return toolCalls.filter(call => {
+      if (call.threadId !== currentThreadId) return false;
+  
+      if (call.type === 'function') {
+        // Only include tool calls where arguments are non-empty
+        return call.function && call.function.arguments && call.function.arguments.trim() !== '{}';
+      } else if (call.type === 'code_interpreter') {
+        // Similarly handle code_interpreter type if needed
+        return call.code_interpreter && call.code_interpreter.input && call.code_interpreter.input.trim() !== '';
+      }
+      return false;
+    });
   }, [toolCalls, currentThreadId]);
 
   const pendingToolCalls = useMemo(() => {
@@ -47,11 +49,13 @@ const ToolCallHandler = () => {
   useEffect(() => {
     console.log('ToolCallHandler state:', { currentThreadToolCalls, isToolCallInProgress, pendingToolCalls, currentThreadId });
   }, [currentThreadToolCalls, isToolCallInProgress, pendingToolCalls, currentThreadId]);
-
-  if (!isToolCallInProgress && currentThreadToolCalls.length === 0) {
-    console.log('ToolCallHandler not rendering: no active tool calls for current thread');
-    return null;
-  }
+  
+  useEffect(() => {
+    if (currentThreadToolCalls.length > 0 || isToolCallInProgress) {
+      console.log('ToolCallHandler triggering re-render');
+      // This will force the re-render whenever the tool call state changes.
+    }
+  }, [currentThreadToolCalls, isToolCallInProgress]);
 
   console.log('ToolCallHandler rendering');
 
@@ -74,7 +78,7 @@ const ToolCallHandler = () => {
           <Typography variant="caption" sx={{ display: 'block', mt: 0.5, mb: 0.5, color: '#bbb' }}>
             Arguments:
             <Box sx={{ maxWidth: '100%', overflowX: 'auto' }}>
-              <JSONPretty id={`json-pretty-${toolCall.id}`} data={safeJsonParse(toolCall.function.arguments)} />
+              <JSONPretty id={`json-pretty-${toolCall.id}`} data={safeJsonParse(toolCall.function.arguments || '{}')} />
             </Box>
           </Typography>
         </>
