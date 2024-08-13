@@ -16,8 +16,7 @@ export const useChat = (
   const eventSourceRef = useRef(null);
   const currentMessageRef = useRef('');
   const currentThreadIdRef = useRef(null);
-  const currentToolCallRef = useRef(null);
-  const seenToolCallIdsRef = useRef(new Set());
+  const [subAssistantMessages, setSubAssistantMessages] = useState([]);
 
   const setupEventSource = useCallback((url) => {
     if (eventSourceRef.current) {
@@ -116,12 +115,24 @@ export const useChat = (
     const data = JSON.parse(event.data);
     console.log('Tool call completed:', data);
     addLog(`Tool call completed: ${data.id}`);
+    
+    // Check if the tool call is a messageSubAssistant type
+    if (data.function?.name === 'messageSubAssistant') {
+      const newMessage = {
+        subAssistantName: JSON.parse(data.function.arguments).subAssistantName,
+        query: JSON.parse(data.function.arguments).message,
+        response: data.output ? JSON.parse(data.output) : "No response yet",
+      };
+      setSubAssistantMessages(prev => [...prev, newMessage]);
+    }
+  
     setToolCalls(prev => prev.map(call =>
       call.id === data.id ? { 
         ...call, 
         output: JSON.stringify(data.output) 
       } : call
     ));
+  
     setPendingToolCalls(prev => {
       const newValue = Math.max(0, prev - 1);
       if (newValue === 0) {
@@ -293,6 +304,8 @@ export const useChat = (
     setupEventSource,
     closeEventSource,
     finalizeMessage,
-    handleStreamError
+    handleStreamError,
+    subAssistantMessages,  // Expose subAssistantMessages
+    setSubAssistantMessages // Expose setSubAssistantMessages if needed
   };
 };

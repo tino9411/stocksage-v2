@@ -2,7 +2,7 @@ import { styled, keyframes } from '@mui/system';
 import { Box, TextField, Button, Fab, IconButton, Popper, Paper, Table } from '@mui/material';
 
 // Common styles
-const scrollbarStyles = {
+export const scrollbarStyles = {
   '&::-webkit-scrollbar': {
     width: '8px',
   },
@@ -22,7 +22,7 @@ export const ChatContainer = styled(Box)(({ theme }) => ({
   display: 'flex',
   flexDirection: 'column',
   height: '100vh',
-  width: '1400px',  // Consistent fixed width
+  width: '2000px',  // Consistent fixed width
   backgroundColor: '#373944',
   color: theme.palette.text.primary,
   overflow: 'hidden',
@@ -58,7 +58,7 @@ export const SidebarToggleButton = styled(Box, {
   shouldForwardProp: (prop) => prop !== 'isSidebarVisible',
 })(({ theme, isSidebarVisible }) => ({
   position: 'absolute',
-  right: isSidebarVisible ? '300px' : '0',
+  right: isSidebarVisible ? '500px' : '0',
   top: '50%',
   transform: 'translateY(-50%)',
   zIndex: 1200,

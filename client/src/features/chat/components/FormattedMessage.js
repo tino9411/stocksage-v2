@@ -1,6 +1,4 @@
-// stocksage-v2/client/src/features/chat/components/FormattedMessage.js
-
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useMemo } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Typography, TableBody, TableCell, TableHead, TableRow, Box, Link, Button } from '@mui/material';
@@ -33,17 +31,17 @@ const FileLink = ({ href, children }) => {
   );
 };
 
-const FormattedMessage = ({ content, isStreaming }) => {
-  console.log(`FormattedMessage rendering, content length: ${content.length}, isStreaming: ${isStreaming}`);
+const FormattedMessage = ({ content, isStreaming, isSidebar }) => {
+  console.log(`FormattedMessage rendering, content length: ${content.length}, isStreaming: ${isStreaming}, isSidebar: ${isSidebar}`);
 
   const components = useMemo(() => ({
-    h1: (props) => <Typography variant="h5" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold' }} />,
-    h2: (props) => <Typography variant="h6" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold' }} />,
-    h3: (props) => <Typography variant="subtitle1" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold' }} />,
-    p: (props) => <Typography variant="body1" {...props} style={{ marginBottom: '0.5em' }} />,
-    ul: (props) => <Typography component="ul" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em' }} />,
-    ol: (props) => <Typography component="ol" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em' }} />,
-    li: (props) => <Typography component="li" variant="body1" {...props} style={{ marginBottom: '0.25em', paddingLeft: '0.5em' }} />,
+    h1: (props) => <Typography variant="h5" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '1.25rem' }} />,
+    h2: (props) => <Typography variant="h6" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '1rem' }} />,
+    h3: (props) => <Typography variant="subtitle1" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.75rem' : '1.1rem' }} />,
+    p: (props) => <Typography variant="body1" {...props} style={{ marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
+    ul: (props) => <Typography component="ul" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
+    ol: (props) => <Typography component="ol" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
+    li: (props) => <Typography component="li" variant="body1" {...props} style={{ marginBottom: '0.25em', paddingLeft: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
     code: ({ inline, className, children, ...props }) => {
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';
@@ -67,7 +65,7 @@ const FormattedMessage = ({ content, isStreaming }) => {
           backgroundColor: '#424557',
           padding: '2px 4px',
           borderRadius: '10px',
-          fontSize: '0.875em',
+          fontSize: isSidebar ? '0.75em' : '0.875em',
         }} {...props}>
           {children}
         </Box>
@@ -79,7 +77,7 @@ const FormattedMessage = ({ content, isStreaming }) => {
         padding: '8px',
         borderRadius: '4px',
         overflowX: 'auto',
-        fontSize: '0.875em',
+        fontSize: isSidebar ? '0.75em' : '0.875em',
       }} {...props} />
     ),
     table: (props) => <StyledTable {...props} />,
@@ -87,7 +85,7 @@ const FormattedMessage = ({ content, isStreaming }) => {
     tbody: TableBody,
     tr: TableRow,
     td: TableCell,
-    th: (props) => <TableCell {...props} style={{ fontWeight: 'bold' }} />,
+    th: (props) => <TableCell {...props} style={{ fontWeight: 'bold', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
     img: ({ node, ...props }) => (
       <Box component="span" sx={{ display: 'block', maxWidth: '100%', margin: '1em 0' }}>
         <img style={{ maxWidth: '100%', height: 'auto' }} {...props} alt={props.alt || 'Generated image'} />
@@ -100,7 +98,7 @@ const FormattedMessage = ({ content, isStreaming }) => {
       }
       return <Link {...props} target="_blank" rel="noopener noreferrer" />;
     },
-  }), []);
+  }), [isSidebar]);
 
   return (
     <Box>

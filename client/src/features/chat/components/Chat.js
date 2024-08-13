@@ -1,19 +1,22 @@
-import React, { useState, useEffect, useContext } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useChatState } from '../hooks/useChatState';
 import ChatHeader from './ChatHeader';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ToolCallHandler from './ToolCallHandler';
 import ThreadSidebar from './ThreadSidebar';
+import Sidebar from './Sidebar'; // Import Sidebar component
 import { 
   ChatContainer, 
   ChatLayout, 
   ChatBox, 
   MessageList as StyledMessageList,
-  InputArea as StyledInputArea
+  InputArea as StyledInputArea,
+  SidebarToggleButton // Import SidebarToggleButton styled component
 } from '../styles/chatStyles';
-import { Typography } from '@mui/material';
-import ChatContext from '../context/ChatContext';
+import { Typography, Box, IconButton } from '@mui/material';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 
 function Chat() {
   const {
@@ -26,11 +29,15 @@ function Chat() {
     threads,
     messages,
     loadInitialMessages,
+    subAssistantMessages, // Access subAssistantMessages from chat state
+    toolCalls,
+    isToolCallInProgress
   } = useChatState();
 
-  const { toolCalls, isToolCallInProgress } = useContext(ChatContext);  // Access context for tool calls state
-
   const [error, setError] = useState(null);
+  const [isSidebarVisible, setIsSidebarVisible] = useState(false); // State for sidebar visibility
+
+  
 
   useEffect(() => {
     if (currentThreadId) {
@@ -86,6 +93,10 @@ function Chat() {
     }
   };
 
+  const toggleSidebar = () => {
+    setIsSidebarVisible((prev) => !prev);
+  };
+
   if (error) {
     return (
       <ChatContainer>
@@ -103,7 +114,7 @@ function Chat() {
           threads={threads}
           selectedThreadId={currentThreadId}
         />
-        <ChatBox>
+        <ChatBox isSidebarVisible={isSidebarVisible}>
           <ChatHeader 
             onEndChat={handleEndChat} 
             currentThreadId={currentThreadId}
@@ -111,12 +122,12 @@ function Chat() {
           <StyledMessageList>
             {isThreadCreated ? (
               <>
-                <MessageList messages={messages} currentThreadId={currentThreadId} />
-                {(toolCalls.length > 0 || isToolCallInProgress) && <ToolCallHandler />}
-              </>
+              <MessageList messages={messages} currentThreadId={currentThreadId} />
+              {(toolCalls.length > 0 || isToolCallInProgress) && <ToolCallHandler />}
+              <Sidebar subAssistantMessages={subAssistantMessages} isVisible={isSidebarVisible} />
+            </>
             ) : (
               <Typography variant="body1" align="center">
-                No active thread. Please create or select a thread.
               </Typography>
             )}
           </StyledMessageList>
@@ -124,6 +135,16 @@ function Chat() {
             <InputArea onSendMessage={handleSendMessage} />
           </StyledInputArea>
         </ChatBox>
+
+        {/* Sidebar Toggle Button */}
+        <Box position="relative">
+          <SidebarToggleButton onClick={toggleSidebar} isSidebarVisible={isSidebarVisible}>
+            <IconButton color="inherit">
+              {isSidebarVisible ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+            </IconButton>
+          </SidebarToggleButton>
+          <Sidebar subAssistantMessages={subAssistantMessages} isVisible={isSidebarVisible} />
+        </Box>
       </ChatLayout>
     </ChatContainer>
   );

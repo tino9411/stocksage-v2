@@ -54,7 +54,9 @@ export const ChatProvider = ({ children }) => {
     setupEventSource,
     closeEventSource,
     finalizeMessage,
-    handleStreamError
+    handleStreamError,
+    subAssistantMessages,  // Add this line
+    setSubAssistantMessages // Add this line
   } = useChat(
     addLog,
     setMessages,
@@ -102,7 +104,9 @@ export const ChatProvider = ({ children }) => {
     closeEventSource,
     finalizeMessage,
     handleStreamError,
-    pendingToolCalls
+    pendingToolCalls,
+    subAssistantMessages, // Add this line
+    setSubAssistantMessages // Add this line
   }), [
     messages,
     setMessages,
@@ -132,7 +136,9 @@ export const ChatProvider = ({ children }) => {
     closeEventSource,
     finalizeMessage,
     handleStreamError,
-    pendingToolCalls
+    pendingToolCalls,
+    subAssistantMessages, // Add this line
+    setSubAssistantMessages // Add this line
   ]);
 
   return (
