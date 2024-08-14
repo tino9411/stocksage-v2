@@ -534,14 +534,15 @@ export const fadeIn = keyframes`
 
 export const SidebarContainer = styled(Box)(({ theme, isVisible }) => ({
   position: 'fixed',
-  right: isVisible ? 0 : '-100%',
-  top: 0,
+  right: isVisible ? 10 : '-100%',
+  top: 70,
   width: '500px',
-  height: '100%',
+  height: '90%',
   backgroundColor: '#3f4150',
   color: '#ffffff',
   transition: 'right 0.3s ease-in-out',
   boxShadow: '0 0 10px rgba(0, 0, 0, 0.1)',
+  borderRadius: '20px 20px',
   display: 'flex',
   flexDirection: 'column',
   zIndex: 1200,
@@ -556,6 +557,7 @@ export const SidebarHeader = styled(Box)(({ theme }) => ({
   position: 'sticky',
   top: 0,
   backgroundColor: '#3f4150',
+  borderRadius: '20px 20px 0px 0px',
   zIndex: 1,
   padding: theme.spacing(2),
   borderBottom: `1px solid ${theme.palette.divider}`,
@@ -596,7 +598,7 @@ export const SidebarToggleButton = styled(IconButton)(({ theme, isVisible }) => 
     backgroundColor: theme.palette.action.hover,
   },
   zIndex: 1300,
-  transition: 'right 0.3s ease-in-out',
+  transition: 'right 0.1s ease-in-out',
 
   [theme.breakpoints.down('sm')]: {
     top: 'auto',
