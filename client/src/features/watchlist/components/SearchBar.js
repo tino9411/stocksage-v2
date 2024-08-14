@@ -9,7 +9,7 @@ import {
 } from '@mui/material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
-import { SearchBarContainer, SearchResultsList, ErrorMessage } from '../styles/SearchBarStyles';
+import { SearchBarContainer, SearchResultsList, ErrorMessage } from '../styles/watchlistStyles';
 
 const SearchBar = ({ 
   searchTerm, 

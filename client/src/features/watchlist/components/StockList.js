@@ -1,7 +1,7 @@
 import React from 'react';
 import { Typography } from '@mui/material';
 import StockItem from './StockItem';
-import { StyledStockList } from '../styles/StockListStyles';
+import { StyledStockList } from '../styles/watchlistStyles';
 
 const StockList = ({ filteredWatchlist = [], removeFromWatchlist }) => {
   if (filteredWatchlist.length === 0) {

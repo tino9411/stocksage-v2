@@ -35,13 +35,13 @@ const FormattedMessage = ({ content, isStreaming, isSidebar }) => {
   console.log(`FormattedMessage rendering, content length: ${content.length}, isStreaming: ${isStreaming}, isSidebar: ${isSidebar}`);
 
   const components = useMemo(() => ({
-    h1: (props) => <Typography variant="h5" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '1.25rem' }} />,
-    h2: (props) => <Typography variant="h6" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '1rem' }} />,
-    h3: (props) => <Typography variant="subtitle1" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.75rem' : '1.1rem' }} />,
-    p: (props) => <Typography variant="body1" {...props} style={{ marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
-    ul: (props) => <Typography component="ul" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
-    ol: (props) => <Typography component="ol" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
-    li: (props) => <Typography component="li" variant="body1" {...props} style={{ marginBottom: '0.25em', paddingLeft: '0.5em', fontSize: isSidebar ? '0.75rem' : '1rem' }} />,
+    h1: (props) => <Typography variant="h5" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '0.9rem' }} />,
+    h2: (props) => <Typography variant="h6" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.875rem' : '0.9rem' }} />,
+    h3: (props) => <Typography variant="subtitle1" {...props} style={{ marginBottom: '0.5em', fontWeight: 'bold', fontSize: isSidebar ? '0.75rem' : '0.9rem' }} />,
+    p: (props) => <Typography variant="body1" {...props} style={{ marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '0.9rem' }} />,
+    ul: (props) => <Typography component="ul" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '0.8rem' }} />,
+    ol: (props) => <Typography component="ol" variant="body1" {...props} style={{ marginLeft: '1em', marginBottom: '0.5em', fontSize: isSidebar ? '0.75rem' : '0.8rem' }} />,
+    li: (props) => <Typography component="li" variant="body1" {...props} style={{ marginBottom: '0.25em', paddingLeft: '0.5em', fontSize: isSidebar ? '0.75rem' : '0.9rem' }} />,
     code: ({ inline, className, children, ...props }) => {
       const match = /language-(\w+)/.exec(className || '');
       const language = match ? match[1] : '';

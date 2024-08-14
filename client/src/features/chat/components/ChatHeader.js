@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, IconButton } from '@mui/material';
+import { IconButton } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import EndChatDialog from './EndChatDialog';
 import CloseIcon from '@mui/icons-material/Close';

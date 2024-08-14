@@ -112,14 +112,12 @@ const ToolCallHandler = () => {
 
   return (
     <Box sx={{
-      position: 'relative',
-      right: 55, 
       mt: 1, 
       mb: 1,
       maxWidth: '800px', 
       width: '100%',
       margin: '0 auto',
-      maxHeight: '400px',
+      maxHeight: '200px',
       overflow: 'auto',
       border: `1px solid ${theme.palette.divider}`,
       borderRadius: theme.shape.borderRadius,

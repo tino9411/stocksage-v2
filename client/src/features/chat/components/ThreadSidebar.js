@@ -11,7 +11,7 @@ import {
     ThreadTitle,
     ThreadInfo,
     ThreadListItemContent
-} from '../styles/threadStyles';
+} from '../styles/chatStyles';  // Updated import path
 
 function ThreadSidebar({ onSelectThread, selectedThreadId, threads, onCreateThread }) {
     const getThreadTitle = (threadId) => {

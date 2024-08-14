@@ -114,7 +114,7 @@ function Chat() {
           threads={threads}
           selectedThreadId={currentThreadId}
         />
-        <ChatBox isSidebarVisible={isSidebarVisible}>
+        <ChatBox>
           <ChatHeader 
             onEndChat={handleEndChat} 
             currentThreadId={currentThreadId}
@@ -122,12 +122,12 @@ function Chat() {
           <StyledMessageList>
             {isThreadCreated ? (
               <>
-              <MessageList messages={messages} currentThreadId={currentThreadId} />
-              {(toolCalls.length > 0 || isToolCallInProgress) && <ToolCallHandler />}
-              <Sidebar subAssistantMessages={subAssistantMessages} isVisible={isSidebarVisible} />
-            </>
+                <MessageList messages={messages} currentThreadId={currentThreadId} />
+                {(toolCalls.length > 0 || isToolCallInProgress) && <ToolCallHandler />}
+              </>
             ) : (
               <Typography variant="body1" align="center">
+                No active thread. Please create or select a thread to start chatting.
               </Typography>
             )}
           </StyledMessageList>
@@ -135,16 +135,14 @@ function Chat() {
             <InputArea onSendMessage={handleSendMessage} />
           </StyledInputArea>
         </ChatBox>
-
-        {/* Sidebar Toggle Button */}
-        <Box position="relative">
-          <SidebarToggleButton onClick={toggleSidebar} isSidebarVisible={isSidebarVisible}>
-            <IconButton color="inherit">
-              {isSidebarVisible ? <ChevronRightIcon /> : <ChevronLeftIcon />}
-            </IconButton>
-          </SidebarToggleButton>
-          <Sidebar subAssistantMessages={subAssistantMessages} isVisible={isSidebarVisible} />
-        </Box>
+        <Sidebar subAssistantMessages={subAssistantMessages} isVisible={isSidebarVisible} />
+        <SidebarToggleButton 
+          onClick={toggleSidebar} 
+          aria-label="Toggle sidebar"
+          isVisible={isSidebarVisible}
+        >
+          {isSidebarVisible ? <ChevronRightIcon /> : <ChevronLeftIcon />}
+        </SidebarToggleButton>
       </ChatLayout>
     </ChatContainer>
   );

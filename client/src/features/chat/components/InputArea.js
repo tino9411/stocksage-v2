@@ -11,7 +11,8 @@ import {
   StyledButton, 
   FullWidthBox,
   CommandPopper,
-  CommandItem
+  CommandItem,
+  ButtonContainer // Add this import
 } from '../styles/chatStyles';
 import { Paper, Typography, ClickAwayListener, IconButton, Box, CircularProgress, Snackbar, Alert } from '@mui/material';
 import FilePreviewComponent from './FilePreviewComponent';
@@ -262,30 +263,31 @@ function InputAreaComponent() {
               </Paper>
             </CommandPopper>
           </div>
-          <input
-            type="file"
-            multiple
-            style={{ display: 'none' }}
-            ref={fileInputRef}
-            onChange={handleFileUpload}
-            aria-label="Upload files"
-          />
-          <IconButton
-            onClick={() => fileInputRef.current?.click()}
-            disabled={isStreaming || isLoading}
-            style={{ marginRight: '8px' }}
-            aria-label="Attach files"
-          >
-            <AttachFileIcon />
-          </IconButton>
-          <StyledButton
-            variant="contained"
-            onClick={handleSendMessage}
-            disabled={((!input.trim() && uploadedFiles.length === 0) || isStreaming || isLoading)}
-            aria-label="Send message or upload files"
-          >
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
-          </StyledButton>
+          <ButtonContainer>
+            <input
+              type="file"
+              multiple
+              style={{ display: 'none' }}
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              aria-label="Upload files"
+            />
+            <IconButton
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isStreaming || isLoading}
+              aria-label="Attach files"
+            >
+              <AttachFileIcon />
+            </IconButton>
+            <StyledButton
+              variant="contained"
+              onClick={handleSendMessage}
+              disabled={((!input.trim() && uploadedFiles.length === 0) || isStreaming || isLoading)}
+              aria-label="Send message or upload files"
+            >
+              {isLoading ? <CircularProgress size={24} color="inherit" /> : <SendIcon />}
+            </StyledButton>
+          </ButtonContainer>
         </InputArea>
       </ClickAwayListener>
       <Snackbar 

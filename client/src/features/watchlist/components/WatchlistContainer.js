@@ -1,11 +1,17 @@
-import React from 'react';
-import { Typography, CircularProgress } from '@mui/material';
-import { StyledWatchlistContainer } from '../styles/WatchlistContainerStyles';
+import React, { useState } from 'react';
+import { Typography, CircularProgress, IconButton } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import CloseIcon from '@mui/icons-material/Close';
 import SearchBar from './SearchBar';
 import WatchlistFilter from './WatchlistFilter';
 import StockList from './StockList';
 import { useWatchlistContext } from '../contexts/WatchlistContext';
 import { useUser } from '../../../contexts/UserContext';
+import {
+  StyledWatchlistContainer,
+  WatchlistToggleButton,
+  WatchlistWrapper,
+} from '../styles/watchlistStyles';
 
 function WatchlistContainer() {
   const { user } = useUser();
@@ -22,6 +28,12 @@ function WatchlistContainer() {
     addToWatchlist,
     removeFromWatchlist
   } = useWatchlistContext();
+
+  const [isWatchlistVisible, setIsWatchlistVisible] = useState(false);
+
+  const toggleWatchlist = () => {
+    setIsWatchlistVisible(!isWatchlistVisible);
+  };
 
   if (!user) {
     return (
@@ -48,25 +60,34 @@ function WatchlistContainer() {
   }
 
   return (
-    <StyledWatchlistContainer>
-      <SearchBar
-        searchTerm={searchTerm}
-        handleSearchChange={handleSearchChange}
-        searchResults={searchResults}
-        addToWatchlist={addToWatchlist}
-        loading={loading}
-        error={error}
-      />
-      <WatchlistFilter
-        stocks={watchlist}
-        selectedStocks={selectedStocks}
-        handleFilterChange={handleFilterChange}
-      />
-      <StockList
-        filteredWatchlist={filteredWatchlist}
-        removeFromWatchlist={removeFromWatchlist}
-      />
-    </StyledWatchlistContainer>
+    <>
+      <WatchlistToggleButton>
+        <IconButton onClick={toggleWatchlist} color="primary">
+          {isWatchlistVisible ? <CloseIcon /> : <MenuIcon />}
+        </IconButton>
+      </WatchlistToggleButton>
+      <WatchlistWrapper isVisible={isWatchlistVisible}>
+        <StyledWatchlistContainer>
+          <SearchBar
+            searchTerm={searchTerm}
+            handleSearchChange={handleSearchChange}
+            searchResults={searchResults}
+            addToWatchlist={addToWatchlist}
+            loading={loading}
+            error={error}
+          />
+          <WatchlistFilter
+            stocks={watchlist}
+            selectedStocks={selectedStocks}
+            handleFilterChange={handleFilterChange}
+          />
+          <StockList
+            filteredWatchlist={filteredWatchlist}
+            removeFromWatchlist={removeFromWatchlist}
+          />
+        </StyledWatchlistContainer>
+      </WatchlistWrapper>
+    </>
   );
 }
 

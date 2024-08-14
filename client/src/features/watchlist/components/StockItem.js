@@ -8,7 +8,7 @@ import {
   StockSymbol,
   StockPrice,
   StockChange
-} from '../styles/StockItemStyles';
+} from '../styles/watchlistStyles';
 
 
 const StockItem = ({ stock, onRemove }) => {

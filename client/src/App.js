@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { CssBaseline, ThemeProvider, createTheme } from '@mui/material';
 import { ChatProvider } from './features/chat';
@@ -8,6 +8,7 @@ import { AuthCallback } from './features/auth';
 import LoginPage from './pages/LoginPage';
 import { useUser } from './contexts/UserContext';
 import LoadingSpinner from './components/ui/LoadingSpinner';
+import { handleResizeObserverError } from './utils/errorHandler';
 
 const darkTheme = createTheme({
   palette: {
@@ -31,6 +32,10 @@ const PrivateRoute = ({ children }) => {
 };
 
 function App() {
+  useEffect(() => {
+    handleResizeObserverError();
+  }, []);
+
   return (
     <ThemeProvider theme={darkTheme}>
       <CssBaseline />
